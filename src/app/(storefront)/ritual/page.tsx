@@ -44,11 +44,11 @@ export default function RitualPage() {
     <>
       <header className="bg-wax px-5 pb-16 pt-16 text-obsidian sm:px-8 sm:pb-20 sm:pt-24">
         <div className="mx-auto max-w-7xl">
-          <p className="label text-gild-deep">The ritual</p>
+          <p className="label text-obsidian/55">The ritual</p>
           <h1 className="display-lg mt-5 max-w-[16ch] text-obsidian">
             How to burn it <span className="script script-ink text-gild-deep">properly</span>
           </h1>
-          <p className="mt-6 max-w-[54ch] text-[17px] leading-relaxed text-obsidian/65">
+          <p className="mt-6 max-w-[54ch] text-[17px] leading-relaxed text-obsidian/80">
             A hand-poured candle behaves differently from a supermarket one. Four
             habits will roughly double what you get out of it — and the last one you
             keep.
@@ -78,12 +78,12 @@ export default function RitualPage() {
             {STEPS.map((item, i) => (
               <li
                 key={item.step}
-                className="reveal border-t border-obsidian/12 py-10 first:border-t-0 first:pt-0"
+                className="reveal border-t border-obsidian/20 py-10 first:border-t-0 first:pt-0"
                 style={{ '--reveal-delay': `${i * 90}ms` } as React.CSSProperties}
               >
-                <p className="label text-gild-deep">{item.step}</p>
+                <p className="label text-obsidian/55">{item.step}</p>
                 <h2 className="display-md mt-4 text-obsidian">{item.title}</h2>
-                <p className="mt-4 max-w-[58ch] text-[15.5px] leading-[1.78] text-obsidian/70">
+                <p className="mt-4 max-w-[58ch] text-[15.5px] leading-[1.78] text-obsidian/80">
                   {item.body}
                 </p>
               </li>

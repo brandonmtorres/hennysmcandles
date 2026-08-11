@@ -20,10 +20,13 @@ const SKY: Stop[] = [
   { at: 0.0, zenith: [7, 7, 15], horizon: [13, 11, 22] },
   { at: 0.2, zenith: [16, 11, 34], horizon: [36, 20, 54] },
   { at: 0.38, zenith: [29, 16, 48], horizon: [74, 31, 61] },
-  { at: 0.55, zenith: [53, 32, 63], horizon: [138, 58, 52] },
-  { at: 0.72, zenith: [107, 63, 58], horizon: [196, 113, 58] },
-  { at: 0.87, zenith: [176, 138, 94], horizon: [227, 171, 99] },
-  { at: 1.0, zenith: [222, 210, 184], horizon: [242, 234, 217] },
+  { at: 0.55, zenith: [58, 38, 66], horizon: [132, 66, 62] },
+  // Gold rather than pumpkin. A more saturated orange here looked striking on
+  // its own but the bright section's ink and gold text sit on top of it, and
+  // both lost too much contrast.
+  { at: 0.72, zenith: [124, 92, 86], horizon: [188, 136, 96] },
+  { at: 0.87, zenith: [193, 168, 138], horizon: [231, 197, 152] },
+  { at: 1.0, zenith: [230, 220, 199], horizon: [242, 234, 217] },
 ]
 
 function mix(a: Rgb, b: Rgb, t: number): Rgb {

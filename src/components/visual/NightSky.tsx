@@ -66,22 +66,42 @@ export function NightSky() {
     let shooter: Shooter | null = null
     let nextShooter = 340 + Math.random() * 700
 
+    const addStar = (x: number, y: number, depthBias = 0) => {
+      const depth = Math.min(1, Math.random() * (1 - depthBias) + depthBias)
+      stars.push({
+        x,
+        y,
+        radius: 0.45 + depth * 1.5,
+        depth,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.006 + Math.random() * 0.022,
+        flare: depth > 0.86,
+      })
+    }
+
     const build = () => {
       stars.length = 0
-      // Density scaled to area so a wide monitor is not sparse and a phone
-      // is not overcrowded.
-      const count = Math.min(320, Math.round((width * height) / 5200))
-      for (let i = 0; i < count; i += 1) {
-        const depth = Math.random()
-        stars.push({
-          x: Math.random() * width,
-          y: Math.random() * height,
-          radius: 0.35 + depth * 1.25,
-          depth,
-          phase: Math.random() * Math.PI * 2,
-          speed: 0.006 + Math.random() * 0.02,
-          flare: depth > 0.88,
-        })
+
+      // Density scaled to area so a wide monitor is not sparse and a phone is
+      // not overcrowded. Roughly double the earlier figure — at the previous
+      // density the night read as a plain dark ground rather than a sky.
+      const scattered = Math.min(620, Math.round((width * height) / 2600))
+      for (let i = 0; i < scattered; i += 1) {
+        addStar(Math.random() * width, Math.random() * height)
+      }
+
+      // A band of denser, fainter stars running corner to corner. Real skies
+      // are not evenly seeded, and the clustering is most of what separates
+      // "night sky" from "dots on black".
+      const banded = Math.round(scattered * 0.55)
+      for (let i = 0; i < banded; i += 1) {
+        const t = Math.random()
+        const bx = width * (0.05 + t * 0.95)
+        const by = height * (0.1 + t * 0.72)
+        // Gaussian-ish spread perpendicular to the band.
+        const spread =
+          ((Math.random() + Math.random() + Math.random()) / 3 - 0.5) * height * 0.42
+        addStar(bx + spread * 0.35, by + spread)
       }
 
       motes.length = 0
@@ -167,11 +187,35 @@ export function NightSky() {
 
       context.clearRect(0, 0, width, height)
 
-      const skyVisibility = 1 - dawn * 0.85
+      const skyVisibility = 1 - dawn * 0.9
 
+      // --- Nebulae -----------------------------------------------------------
+      // Two soft clouds behind the stars. They give the band somewhere to sit
+      // and keep the night from being a flat field.
+      if (skyVisibility > 0.02) {
+        const clouds: [number, number, number, string][] = [
+          [0.24, 0.3, 0.42, `rgba(124,106,156,${0.1 * skyVisibility})`],
+          [0.74, 0.62, 0.36, `rgba(86,104,164,${0.075 * skyVisibility})`],
+        ]
+        for (const [cx, cy, r, colour] of clouds) {
+          const px = width * cx
+          const py = height * cy - progress * height * 0.4
+          const gradient = context.createRadialGradient(
+            px, py, 0,
+            px, py, Math.max(width, height) * r,
+          )
+          gradient.addColorStop(0, colour)
+          gradient.addColorStop(1, 'rgba(0,0,0,0)')
+          context.globalAlpha = 1
+          context.fillStyle = gradient
+          context.fillRect(0, 0, width, height)
+        }
+      }
+
+      // --- Stars -------------------------------------------------------------
       for (const star of stars) {
-        const twinkle = 0.45 + 0.4 * Math.sin(star.phase + time * star.speed)
-        const alpha = Math.max(0, twinkle * (0.25 + star.depth * 0.75) * skyVisibility)
+        const twinkle = 0.5 + 0.42 * Math.sin(star.phase + time * star.speed)
+        const alpha = Math.max(0, twinkle * (0.34 + star.depth * 0.72) * skyVisibility)
         if (alpha <= 0.01) continue
         // Nearer stars travel further — parallax across the whole document.
         const offset = progress * height * (0.25 + star.depth * 1.5)

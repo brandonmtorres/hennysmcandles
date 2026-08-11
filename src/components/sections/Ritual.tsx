@@ -41,7 +41,7 @@ export function Ritual() {
       <div className="mx-auto max-w-7xl">
         <div className="grid gap-14 lg:grid-cols-[1fr_1.15fr] lg:gap-20">
           <div className="lg:sticky lg:top-32 lg:self-start">
-            <p className="label reveal text-gild-deep">The ritual</p>
+            <p className="label reveal text-obsidian/60">The ritual</p>
             <h2
               className="display-lg reveal mt-5 text-obsidian"
               id="ritual-heading"
@@ -50,7 +50,7 @@ export function Ritual() {
               How to burn it<span className="script script-ink text-gild-deep"> properly</span>
             </h2>
             <p
-              className="reveal mt-6 max-w-[42ch] text-[17px] leading-relaxed text-obsidian/65"
+              className="reveal mt-6 max-w-[42ch] text-[17px] leading-relaxed text-obsidian/80"
               style={{ '--reveal-delay': '150ms' } as React.CSSProperties}
             >
               A hand-poured candle behaves differently from a supermarket one.
@@ -76,12 +76,12 @@ export function Ritual() {
             {STEPS.map((item, i) => (
               <li
                 key={item.step}
-                className="reveal border-t border-obsidian/12 py-10 first:border-t-0 first:pt-0"
+                className="reveal border-t border-obsidian/20 py-10 first:border-t-0 first:pt-0"
                 style={{ '--reveal-delay': `${i * 110}ms` } as React.CSSProperties}
               >
-                <p className="label text-gild-deep">{item.step}</p>
+                <p className="label text-obsidian/55">{item.step}</p>
                 <h3 className="display-md mt-4 text-obsidian">{item.title}</h3>
-                <p className="mt-4 max-w-[56ch] text-[15.5px] leading-[1.75] text-obsidian/70">
+                <p className="mt-4 max-w-[56ch] text-[15.5px] leading-[1.75] text-obsidian/80">
                   {item.body}
                 </p>
               </li>
@@ -89,8 +89,8 @@ export function Ritual() {
           </ol>
         </div>
 
-        <div className="reveal mt-16 flex flex-wrap items-center gap-6 border-t border-obsidian/12 pt-10">
-          <p className="max-w-[46ch] text-[15px] leading-relaxed text-obsidian/65">
+        <div className="reveal mt-16 flex flex-wrap items-center gap-6 border-t border-obsidian/20 pt-10">
+          <p className="max-w-[46ch] text-[15px] leading-relaxed text-obsidian/80">
             Every order ships with a printed card of this, in case you forget.
           </p>
           <ButtonLink href="/ritual" variant="onLightOutline" size="sm">

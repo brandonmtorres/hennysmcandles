@@ -18,7 +18,9 @@ export function Collection({
       className="veil border-t border-wax/8 px-5 py-24 sm:px-8 sm:py-32"
       aria-labelledby="collection-heading"
     >
-      <div className="relative mx-auto max-w-7xl">
+      {/* Wider than the rest of the page so six tiles have room to breathe
+          across a single row. */}
+      <div className="relative mx-auto max-w-[92rem]">
         <div className="flex flex-wrap items-end justify-between gap-8">
           <SectionHeading
             eyebrow="The collection"
@@ -41,13 +43,16 @@ export function Collection({
           </ButtonLink>
         </div>
 
-        <div className="mt-16 grid grid-cols-1 gap-x-7 gap-y-14 sm:grid-cols-2 lg:grid-cols-3">
+        {/* The whole showcase on one row from lg up; two and three columns
+            below that, where a six-across strip would be unreadable. */}
+        <div className="mt-16 grid grid-cols-2 gap-x-4 gap-y-10 sm:grid-cols-3 sm:gap-x-6 lg:grid-cols-6 lg:gap-x-5">
           {products.map((product, index) => (
             <ProductTile
               key={product.id}
               product={product}
               index={index}
-              priority={index < 2}
+              priority={index < 3}
+              compact
             />
           ))}
         </div>
