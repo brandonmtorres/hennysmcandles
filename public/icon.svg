@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <radialGradient id="moon" cx="38%" cy="34%" r="70%">
+      <stop offset="0%" stop-color="#f6f2e8"/>
+      <stop offset="62%" stop-color="#cfccc6"/>
+      <stop offset="100%" stop-color="#8f8c87"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" fill="#0b0b0f"/>
+  <circle cx="32" cy="31" r="19" fill="url(#moon)"/>
+  <circle cx="25" cy="24" r="3.2" fill="#b3b0aa" opacity=".5"/>
+  <circle cx="39" cy="35" r="2.4" fill="#b3b0aa" opacity=".45"/>
+  <circle cx="31" cy="40" r="1.6" fill="#b3b0aa" opacity=".4"/>
+  <path d="M32 47c-2 0-3.4-1.1-3.4-2.7 0-1.4 1-2.3 1-3.6 0-.8-.4-1.4-.4-1.4s2 .9 2 2.6c0 1.3-.7 1.9-.7 2.8 0 .8.7 1.3 1.5 1.3z" fill="#c8a15a" opacity=".9"/>
+  <circle cx="52" cy="12" r="1.1" fill="#f2ead9" opacity=".8"/>
+  <circle cx="11" cy="18" r="0.9" fill="#f2ead9" opacity=".65"/>
+  <circle cx="15" cy="50" r="0.8" fill="#f2ead9" opacity=".5"/>
+  <circle cx="50" cy="48" r="1" fill="#f2ead9" opacity=".6"/>
+</svg>

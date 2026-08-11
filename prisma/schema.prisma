@@ -1,0 +1,221 @@
+// Hennys M. Homemade Candles — data model
+//
+// SQLite for local development. To move to Postgres, change `provider` to
+// "postgresql" and point DATABASE_URL at the new instance; no model changes
+// are required (enums are modelled as strings precisely so this stays true).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Catalog
+// ---------------------------------------------------------------------------
+
+model Product {
+  id       String @id @default(cuid())
+  slug     String @unique
+  name     String
+  tagline  String // one-line hook shown on cards
+  scent    String // e.g. "Sea salt · Driftwood · Bergamot"
+
+  description String // short paragraph for the card + meta description
+  story       String // longer editorial copy for the product page
+
+  // Money is stored in minor units (cents) — never floats.
+  priceCents  Int
+  salePercent Int  @default(0) // 0–90; effective price derived, never stored
+  onSale      Boolean @default(false)
+
+  stock              Int @default(0)
+  lowStockThreshold  Int @default(3)
+
+  // "VISIBLE" | "HIDDEN" | "AUTO"  (AUTO hides itself when stock hits 0)
+  visibility String @default("AUTO")
+
+  // Product detail
+  sizeOz          Float   @default(8)
+  burnTimeHours   Int     @default(45)
+  wick            String  @default("Cotton, lead-free")
+  wax             String  @default("100% natural soy")
+  crystal         String? // e.g. "Black Tourmaline"
+  crystalMeaning  String? // e.g. "Protection and grounding"
+  scentTop        String?
+  scentHeart      String?
+  scentBase       String?
+  ingredients     String  @default("Natural soy wax, phthalate-free fragrance oil, cotton wick, ethically sourced crystals, dried botanicals.")
+
+  featured  Boolean @default(false)
+  sortOrder Int     @default(0)
+
+  images ProductImage[]
+  items  OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([visibility, sortOrder])
+}
+
+model ProductImage {
+  id        String  @id @default(cuid())
+  productId String
+  url       String
+  alt       String
+  sortOrder Int     @default(0)
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+}
+
+// ---------------------------------------------------------------------------
+// Orders
+// ---------------------------------------------------------------------------
+
+model Order {
+  id          String @id @default(cuid())
+  orderNumber String @unique // human-facing, e.g. HM-1042
+
+  // Unique so a replayed Stripe webhook can never create a duplicate order.
+  stripeSessionId       String  @unique
+  stripePaymentIntentId String?
+
+  email String
+  name  String?
+  phone String?
+
+  // "PENDING" | "PAID" | "FULFILLED" | "CANCELLED" | "REFUNDED"
+  status String @default("PENDING")
+
+  subtotalCents Int
+  shippingCents Int    @default(0)
+  taxCents      Int    @default(0)
+  discountCents Int    @default(0)
+  totalCents    Int
+  currency      String @default("usd")
+
+  shippingAddress String? // JSON blob as returned by Stripe
+  trackingNumber  String?
+  carrier         String?
+  internalNotes   String?
+
+  confirmationEmailSentAt DateTime?
+  shippedEmailSentAt      DateTime?
+
+  items OrderItem[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
+  @@index([email])
+}
+
+model OrderItem {
+  id      String @id @default(cuid())
+  orderId String
+
+  // Product may later be deleted; the order must remain a faithful record,
+  // so name/slug/price are denormalised at purchase time.
+  productId String?
+  name      String
+  slug      String
+
+  unitPriceCents Int
+  quantity       Int
+  lineTotalCents Int
+
+  order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  @@index([orderId])
+}
+
+// ---------------------------------------------------------------------------
+// Auth & security
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  passwordHash String
+  name         String?
+  role         String  @default("OWNER") // "OWNER" | "STAFF"
+
+  totpSecret  String?
+  totpEnabled Boolean @default(false)
+
+  // Bumped on password change to invalidate every existing session.
+  sessionEpoch Int @default(0)
+
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+/// Throttles credential stuffing. Rows are pruned opportunistically on write.
+model LoginAttempt {
+  id         String   @id @default(cuid())
+  identifier String // "ip:1.2.3.4" or "email:foo@bar.com"
+  successful Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@index([identifier, createdAt])
+}
+
+/// Append-only trail of every mutating action taken in the portal.
+model AuditLog {
+  id       String  @id @default(cuid())
+  userId   String?
+  userEmail String?
+  action   String // "product.update", "order.refund", ...
+  entity   String?
+  entityId String?
+  meta     String? // JSON
+  ip       String?
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+/// Guarantees Stripe webhooks are processed exactly once.
+model ProcessedWebhook {
+  id          String   @id // the Stripe event id
+  type        String
+  processedAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Store configuration & marketing
+// ---------------------------------------------------------------------------
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model NewsletterSubscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  source    String   @default("footer")
+  createdAt DateTime @default(now())
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  productId String?
+  author    String
+  rating    Int      @default(5)
+  title     String?
+  body      String
+  published Boolean  @default(true)
+  createdAt DateTime @default(now())
+}
