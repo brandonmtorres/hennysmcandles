@@ -52,7 +52,7 @@ const PARTS: Part[] = [
 export function WhatsInside() {
   return (
     <LitSection
-      className="border-t border-wax/8 bg-ash px-5 py-24 sm:px-8 sm:py-32"
+      className="veil-deep border-t border-wax/8 px-5 py-24 sm:px-8 sm:py-32"
       aria-labelledby="inside-heading"
     >
       <div className="mx-auto grid max-w-7xl items-center gap-16 lg:grid-cols-[1.05fr_1fr] lg:gap-20">
@@ -120,7 +120,7 @@ export function WhatsInside() {
             id="inside-heading"
             style={{ '--reveal-delay': '80ms' } as React.CSSProperties}
           >
-            Four things, <span className="italic text-gild">nothing else</span>
+            Four things, <span className="script text-gild">nothing else</span>
           </h2>
           <p
             className="lede reveal mt-6 max-w-[48ch]"

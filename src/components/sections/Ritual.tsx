@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import { ButtonLink } from '@/components/ui/Button'
+import { DawnDivider } from '@/components/visual/DawnDivider'
 
 /**
  * The page's one bright section — the point in the scroll where the light has
@@ -31,9 +32,15 @@ const STEPS = [
 export function Ritual() {
   return (
     <section
-      className="relative overflow-hidden bg-wax px-5 pb-20 pt-24 text-obsidian sm:px-8 sm:pb-24 sm:pt-32"
+      /* The brightest point of the page. ScrollChoreography measures its
+         distance from the viewport centre to drive `--dawn`, so the whole
+         document warms on approach and cools again afterwards. */
+      data-dawn-anchor
+      className="dawnfall relative overflow-hidden px-5 text-obsidian sm:px-8"
       aria-labelledby="ritual-heading"
     >
+      <DawnDivider phase="waxing" label="The light comes up" />
+
       <div className="mx-auto max-w-7xl">
         <div className="grid gap-14 lg:grid-cols-[1fr_1.15fr] lg:gap-20">
           <div className="lg:sticky lg:top-32 lg:self-start">
@@ -43,7 +50,7 @@ export function Ritual() {
               id="ritual-heading"
               style={{ '--reveal-delay': '80ms' } as React.CSSProperties}
             >
-              How to burn it<span className="italic text-gild-deep"> properly</span>
+              How to burn it<span className="script script-ink text-gild-deep"> properly</span>
             </h2>
             <p
               className="reveal mt-6 max-w-[42ch] text-[17px] leading-relaxed text-obsidian/65"
@@ -94,6 +101,8 @@ export function Ritual() {
           </ButtonLink>
         </div>
       </div>
+
+      <DawnDivider phase="waning" label="And the night returns" />
     </section>
   )
 }

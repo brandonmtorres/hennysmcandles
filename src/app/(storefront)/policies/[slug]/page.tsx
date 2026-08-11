@@ -128,7 +128,7 @@ export default async function PolicyPage({ params }: Params) {
   if (!policy) notFound()
 
   return (
-    <article className="bg-obsidian px-5 pb-28 pt-16 sm:px-8 sm:pt-24">
+    <article className="veil px-5 pb-28 pt-16 sm:px-8 sm:pt-24">
       <div className="mx-auto max-w-3xl">
         <p className="label text-gild/90">Policies</p>
         <h1 className="display-lg mt-5 text-wax">{policy.title}</h1>

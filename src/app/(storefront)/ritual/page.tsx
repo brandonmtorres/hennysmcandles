@@ -42,11 +42,11 @@ const SAFETY = [
 export default function RitualPage() {
   return (
     <>
-      <header className="border-b border-obsidian/10 bg-wax px-5 pb-16 pt-16 text-obsidian sm:px-8 sm:pb-20 sm:pt-24">
+      <header className="bg-wax px-5 pb-16 pt-16 text-obsidian sm:px-8 sm:pb-20 sm:pt-24">
         <div className="mx-auto max-w-7xl">
           <p className="label text-gild-deep">The ritual</p>
           <h1 className="display-lg mt-5 max-w-[16ch] text-obsidian">
-            How to burn it <span className="italic text-gild-deep">properly</span>
+            How to burn it <span className="script script-ink text-gild-deep">properly</span>
           </h1>
           <p className="mt-6 max-w-[54ch] text-[17px] leading-relaxed text-obsidian/65">
             A hand-poured candle behaves differently from a supermarket one. Four
@@ -92,7 +92,7 @@ export default function RitualPage() {
         </div>
       </section>
 
-      <section className="border-t border-wax/8 bg-obsidian px-5 py-24 sm:px-8">
+      <section className="veil-deep border-t border-wax/8 px-5 py-24 sm:px-8">
         <div className="mx-auto grid max-w-7xl gap-12 lg:grid-cols-2 lg:gap-20">
           <div>
             <p className="label reveal text-gild/90">Burn safely</p>

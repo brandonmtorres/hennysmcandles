@@ -51,7 +51,7 @@ export function Header({ announcement }: { announcement?: string }) {
       </a>
 
       {announcement ? (
-        <div className="relative z-40 border-b border-wax/8 bg-pitch">
+        <div className="relative z-40 border-b border-wax/8 bg-pitch/75 backdrop-blur-sm">
           <p className="mx-auto max-w-7xl truncate px-5 py-2.5 text-center text-[9px] font-light uppercase tracking-[0.18em] text-gild/85 sm:text-[10px] sm:tracking-[0.28em]">
             {announcement}
           </p>
@@ -62,7 +62,7 @@ export function Header({ announcement }: { announcement?: string }) {
         className={[
           'sticky top-0 z-50 transition-all duration-700 ease-[cubic-bezier(0.22,0.61,0.36,1)]',
           scrolled
-            ? 'border-b border-wax/10 bg-obsidian/85 backdrop-blur-xl'
+            ? 'border-b border-wax/10 bg-obsidian/70 backdrop-blur-xl'
             : 'border-b border-transparent bg-transparent',
         ].join(' ')}
       >

@@ -90,7 +90,7 @@ export default async function ProductPage({ params }: Params) {
         }}
       />
 
-      <div className="border-b border-wax/8 bg-obsidian px-5 pb-14 pt-10 sm:px-8 sm:pb-20">
+      <div className="veil border-b border-wax/8 px-5 pb-14 pt-10 sm:px-8 sm:pb-20">
         <div className="mx-auto max-w-7xl">
           <nav aria-label="Breadcrumb" className="label-sm mb-10 flex gap-2 text-smoke">
             <Link href="/" className="transition-colors hover:text-wax">
@@ -172,7 +172,7 @@ export default async function ProductPage({ params }: Params) {
 
       {/* The story */}
       {product.story ? (
-        <LitSection glow className="bg-obsidian px-5 py-24 sm:px-8">
+        <LitSection glow className="veil-deep px-5 py-24 sm:px-8">
           <div className="relative mx-auto max-w-3xl">
             <p className="label reveal text-gild/90">Why this one exists</p>
             <div
@@ -189,7 +189,7 @@ export default async function ProductPage({ params }: Params) {
 
       {/* Reviews for this candle */}
       {reviews.length > 0 ? (
-        <section className="border-t border-wax/8 bg-pitch px-5 py-20 sm:px-8">
+        <section className="veil border-t border-wax/8 px-5 py-20 sm:px-8">
           <div className="mx-auto max-w-3xl">
             <h2 className="display-md reveal text-wax">What people say about it</h2>
             <ul className="mt-10 flex flex-col gap-10">
@@ -225,7 +225,7 @@ export default async function ProductPage({ params }: Params) {
 
       {/* Related */}
       {related.length > 0 ? (
-        <section className="border-t border-wax/8 bg-obsidian px-5 py-24 sm:px-8">
+        <section className="veil-deep border-t border-wax/8 px-5 py-24 sm:px-8">
           <div className="mx-auto max-w-7xl">
             <h2 className="display-md reveal text-wax">You might also like</h2>
             <div className="mt-14 grid grid-cols-1 gap-x-7 gap-y-14 sm:grid-cols-2 lg:grid-cols-3">

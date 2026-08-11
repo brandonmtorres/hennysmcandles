@@ -1,11 +1,17 @@
 import type { Metadata, Viewport } from 'next'
-import { Bodoni_Moda, Jost } from 'next/font/google'
+import { Allura, Bodoni_Moda, Jost } from 'next/font/google'
 import './globals.css'
 
 /**
- * The type pairing is taken from Hennys' own candle labels: a high-contrast
- * Didone for the scent name, a wide-tracked geometric sans for the small caps
- * beneath it.
+ * All three faces are taken from Hennys' own candle labels.
+ *
+ *  · Bodoni Moda — the high-contrast Didone used for the scent name
+ *  · Jost        — the wide-tracked geometric caps beneath it
+ *  · Allura      — the flowing signature script of the wordmark itself
+ *
+ * Allura carries the accent words in headlines. Bodoni's italic is a Didone
+ * slant, not a script, and reading it next to the real labels made the
+ * difference obvious.
  */
 const bodoni = Bodoni_Moda({
   subsets: ['latin'],
@@ -20,6 +26,13 @@ const jost = Jost({
   display: 'swap',
   variable: '--font-jost',
   weight: ['300', '400', '500'],
+})
+
+const allura = Allura({
+  subsets: ['latin'],
+  display: 'swap',
+  variable: '--font-allura',
+  weight: ['400'],
 })
 
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://hennysmcandles.com'
@@ -74,7 +87,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     */
     <html
       lang="en"
-      className={`${bodoni.variable} ${jost.variable}`}
+      className={`${bodoni.variable} ${jost.variable} ${allura.variable}`}
       suppressHydrationWarning
     >
       <head>

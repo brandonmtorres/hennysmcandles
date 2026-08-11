@@ -42,6 +42,8 @@
 
   --font-display: var(--font-bodoni), 'Bodoni Moda', Didot, 'Times New Roman', serif;
   --font-sans: var(--font-jost), 'Jost', ui-sans-serif, system-ui, sans-serif;
+  /* The signature script from the candle labels. */
+  --font-script: var(--font-allura), 'Allura', 'Snell Roundhand', cursive;
 
   --radius-vessel: 2px;
 
@@ -60,7 +62,12 @@
 
   :root {
     color-scheme: dark;
-    /* Warmth of the travelling light source, 0–1. Set per-section by JS. */
+    /* How near the travelling light is, 0–1. Set on the document by
+       ScrollChoreography and read by the fixed backdrop, so the whole page
+       warms and cools as one movement instead of switching between sections. */
+    --dawn: 0;
+    --scroll-progress: 0;
+    /* Per-section warmth, still used for the local pools of candlelight. */
     --warmth: 0;
   }
 
@@ -70,7 +77,9 @@
   }
 
   body {
-    background-color: var(--color-obsidian);
+    /* The visible ground is the fixed backdrop; this is only the fallback
+       behind it, and what shows during overscroll. */
+    background-color: var(--color-pitch);
     color: var(--color-wax);
     font-family: var(--font-sans);
     font-weight: 300;
@@ -178,6 +187,35 @@
     text-transform: uppercase;
   }
 
+  /*
+   * Accent words set in the wordmark's own script.
+   *
+   * Allura sits noticeably smaller on the line than Bodoni at the same
+   * font-size and its ascenders and descenders run long, so it is scaled up
+   * and given room rather than dropped in at the inherited size.
+   */
+  .script {
+    font-family: var(--font-script);
+    font-weight: 400;
+    font-style: normal;
+    font-size: 1.42em;
+    line-height: 0.86;
+    letter-spacing: 0.01em;
+    padding-right: 0.08em;
+    display: inline-block;
+    vertical-align: baseline;
+    /* The gold reads as lit rather than printed — a candle-flame bloom around
+       the strokes. Colour comes from the text itself, so it stays in key. */
+    text-shadow:
+      0 0 26px color-mix(in oklab, currentColor 42%, transparent),
+      0 0 64px color-mix(in oklab, currentColor 20%, transparent);
+  }
+
+  /* On the cream ground a bloom turns muddy, so the ink script goes without. */
+  .script-ink {
+    text-shadow: none;
+  }
+
   .lede {
     font-size: clamp(1rem, 1.35vw, 1.25rem);
     line-height: 1.62;
@@ -202,7 +240,156 @@
    is here) and warms accordingly. Set by IntersectionObserver, not on scroll.
    --------------------------------------------------------------------------- */
 
+/* ---------------------------------------------------------------------------
+   The night sky — one fixed ground behind the entire document.
+
+   Sections no longer paint their own solid backgrounds. Instead this single
+   surface warms and cools continuously with `--dawn`, so the dusk-to-dawn arc
+   is one movement rather than a stack of hard-edged blocks.
+   --------------------------------------------------------------------------- */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+
+  /*
+   * Base night, warming toward a deep ember as the light approaches.
+   *
+   * The mix runs to 62% because a subtler figure was measurably invisible:
+   * sampling the page showed the ground moving only from rgb(11,11,14) to
+   * rgb(15,13,16) across the entire dawn ramp, which is why the arc read as
+   * "dark, then light" rather than as a sunrise.
+   */
+  background-color: color-mix(
+    in oklab,
+    var(--color-obsidian) calc(100% - var(--dawn) * 62%),
+    #7a5230
+  );
+}
+
+.backdrop::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+
+  background:
+    /* Warm bloom rising from below as dawn arrives. */
+    radial-gradient(
+      140% 90% at 50% 108%,
+      rgba(255, 158, 74, calc(var(--dawn) * 0.30)),
+      transparent 62%
+    ),
+    /* Amethyst aurora, always faintly present — the crystal in the wax. */
+      radial-gradient(
+        75% 55% at 12% calc(18% + var(--scroll-progress) * 30%),
+        rgba(124, 106, 156, 0.20),
+        transparent 62%
+      ),
+    radial-gradient(
+      65% 48% at 88% calc(72% - var(--scroll-progress) * 34%),
+      rgba(139, 123, 168, 0.15),
+      transparent 58%
+    ),
+    /* A cold blue cast at the very top of the night. */
+      radial-gradient(
+        90% 60% at 50% -10%,
+        rgba(58, 66, 104, calc(0.22 - var(--dawn) * 0.18)),
+        transparent 60%
+      );
+}
+
+/* A slow drift so the aurora never sits perfectly still. */
+.backdrop::after {
+  content: '';
+  position: absolute;
+  inset: -20%;
+  background: radial-gradient(
+    38% 30% at 50% 50%,
+    rgba(200, 161, 90, calc(0.10 + var(--dawn) * 0.10)),
+    transparent 70%
+  );
+  animation: aurora 34s ease-in-out infinite alternate;
+}
+
+@keyframes aurora {
+  from {
+    transform: translate3d(-8%, -4%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(9%, 6%, 0) scale(1.16);
+  }
+}
+
 @layer utilities {
+  /*
+   * A bright section that dissolves into the night at both ends instead of
+   * butting against it. The long fades are what stop the arc reading as
+   * "dark block, light block, dark block".
+   */
+  /*
+   * The sunrise itself.
+   *
+   * Fades are a fixed distance rather than a percentage, and they are long —
+   * 440px is roughly half a viewport, so the bloom into light takes real
+   * scrolling instead of snapping over a few frames. The section's padding is
+   * set to clear this band so no text ever sits inside the translucent part.
+   */
+  .dawnfall {
+    background: linear-gradient(
+      180deg,
+      transparent 0px,
+      color-mix(in oklab, var(--color-wax) 8%, transparent) 120px,
+      color-mix(in oklab, var(--color-wax) 24%, transparent) 250px,
+      color-mix(in oklab, var(--color-wax) 46%, transparent) 380px,
+      color-mix(in oklab, var(--color-wax) 70%, transparent) 500px,
+      color-mix(in oklab, var(--color-wax) 90%, transparent) 590px,
+      var(--color-wax) 660px,
+      var(--color-wax) calc(100% - 660px),
+      color-mix(in oklab, var(--color-wax) 90%, transparent) calc(100% - 590px),
+      color-mix(in oklab, var(--color-wax) 70%, transparent) calc(100% - 500px),
+      color-mix(in oklab, var(--color-wax) 46%, transparent) calc(100% - 380px),
+      color-mix(in oklab, var(--color-wax) 24%, transparent) calc(100% - 250px),
+      color-mix(in oklab, var(--color-wax) 8%, transparent) calc(100% - 120px),
+      transparent 100%
+    );
+  }
+
+  /* A 660px fade at each end is two-thirds of a phone screen of scrolling
+     twice over. The sunrise is shortened on small screens to match the
+     divider, which scales down with it. */
+  @media (max-width: 639px) {
+    .dawnfall {
+      background: linear-gradient(
+        180deg,
+        transparent 0px,
+        color-mix(in oklab, var(--color-wax) 14%, transparent) 70px,
+        color-mix(in oklab, var(--color-wax) 42%, transparent) 160px,
+        color-mix(in oklab, var(--color-wax) 76%, transparent) 260px,
+        var(--color-wax) 360px,
+        var(--color-wax) calc(100% - 360px),
+        color-mix(in oklab, var(--color-wax) 76%, transparent) calc(100% - 260px),
+        color-mix(in oklab, var(--color-wax) 42%, transparent) calc(100% - 160px),
+        color-mix(in oklab, var(--color-wax) 14%, transparent) calc(100% - 70px),
+        transparent 100%
+      );
+    }
+  }
+
+  /*
+   * Dark sections are a whisper of tint over the backdrop, not an opaque fill.
+   * These were far heavier at first, which crushed the warming ground beneath
+   * them and hid the whole effect.
+   */
+  .veil {
+    background-color: color-mix(in oklab, var(--color-pitch) 16%, transparent);
+  }
+
+  .veil-deep {
+    background-color: color-mix(in oklab, var(--color-pitch) 30%, transparent);
+  }
+
   /* A soft pool of candlelight, strongest where the light currently is. */
   .lightfall::before {
     content: '';

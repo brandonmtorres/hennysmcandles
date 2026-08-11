@@ -10,7 +10,7 @@ export function MeetHennys() {
   return (
     <LitSection
       glow
-      className="bg-obsidian px-5 py-24 sm:px-8 sm:py-32"
+      className="veil px-5 py-24 sm:px-8 sm:py-32"
       aria-labelledby="hennys-heading"
     >
       <div className="relative mx-auto grid max-w-7xl items-center gap-14 lg:grid-cols-[0.85fr_1fr] lg:gap-20">
@@ -39,7 +39,7 @@ export function MeetHennys() {
             id="hennys-heading"
             style={{ '--reveal-delay': '80ms' } as React.CSSProperties}
           >
-            Hi, <span className="italic text-gild">I&rsquo;m Hennys</span>
+            Hi, <span className="script text-gild">I&rsquo;m Hennys</span>
           </h2>
 
           <blockquote

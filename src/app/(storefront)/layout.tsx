@@ -2,6 +2,7 @@ import { CartProvider } from '@/components/cart/CartProvider'
 import { CartDrawer } from '@/components/cart/CartDrawer'
 import { Header } from '@/components/layout/Header'
 import { Footer } from '@/components/layout/Footer'
+import { Backdrop } from '@/components/visual/Backdrop'
 import { ScrollChoreography } from '@/components/visual/ScrollChoreography'
 import { getSettings } from '@/lib/settings'
 
@@ -14,6 +15,7 @@ export default async function StorefrontLayout({
 
   return (
     <CartProvider>
+      <Backdrop />
       <ScrollChoreography />
       <Header announcement={settings.announcement} />
       <main id="main">{children}</main>

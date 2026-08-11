@@ -19,21 +19,36 @@ Sign into the portal at **`/store-portal`** with the credentials in `.env`
 
 ## The concept
 
-The site takes the brand's own tagline literally: **a single light source
-descends the page as you scroll.** The hero holds a real photograph of a
-burning candle with a canvas of drifting embers over it; each section reads a
-`--warmth` custom property and warms as the light reaches it, cooling again
-behind it.
+The site takes the brand's own tagline literally: **night breaks into dawn and
+back into night as you scroll.**
+
+This is one continuous movement, not a stack of light and dark sections. A
+single fixed backdrop sits behind the entire document and reads a `--dawn`
+custom property that tracks how near the page's bright section is. The ground
+warms from cold obsidian through ember to full wax-cream over roughly 1,450px
+of scrolling, then cools again. Sections above it are near-transparent veils
+rather than opaque fills, so the sky, the aurora and the warming ground stay
+visible through them.
+
+The transition at each end is a long fade — most of a viewport — carried by a
+**moon that waxes as the light arrives and wanes as it leaves**, with a real
+lunar terminator rather than a sliding bar. That turns what would be empty
+ground into the most deliberate moment on the page.
+
+Behind everything is a starfield on three depth layers that parallax apart as
+you scroll, with dust motes drifting up through it and the occasional shooting
+star. The stars fade out as dawn comes up, exactly as they should.
 
 The palette is not invented — it is sampled from the product. Obsidian is the
 matte vessel, wax-cream is the poured soy, gold is the lid foil, amethyst is
-the crystal set into the surface. The page moves between the vessel's black and
-the wax's cream, so it never reads as a generic dark template.
+the crystal set into the surface and now carries the aurora behind the page.
 
-Typography follows the same rule. The candle labels pair a high-contrast
-Didone in caps with wide-tracked geometric small caps, so the site uses
-**Bodoni Moda** and **Jost**. Both are self-hosted through `next/font` — no
-external font requests, which also satisfies the Content Security Policy.
+Typography comes from the candle labels themselves, all three faces:
+**Bodoni Moda** for the Didone scent names, **Jost** for the wide-tracked
+geometric small caps, and **Allura** for the flowing signature script of the
+wordmark, which carries the accent word in every headline and glows like it is
+lit. All self-hosted through `next/font` — no external requests, which also
+satisfies the Content Security Policy.
 
 ---
 
@@ -168,9 +183,21 @@ already-processed session cannot create a second order.
 npm run build            # typecheck + production build
 node scripts/test-webhook.mjs     # order pipeline: signatures, stock, replays, refunds
 node scripts/test-ui.mjs          # navigation, cart, forms, a11y, no-JS, reduced motion
+node scripts/test-navigation.mjs  # content populates on soft navigation, not just hard loads
+node scripts/probe-arc.mjs        # the dusk-to-dawn arc is a gradient, not a hard edge
 node scripts/test-timing.mjs      # login does not leak which accounts exist
 node scripts/test-ratelimit.mjs   # sign-in throttling engages
 ```
+
+Two of these exist because of bugs that were invisible to a screenshot:
+
+- `test-navigation.mjs` — reveal animations queried the DOM once in a layout
+  that never remounts, so every soft-navigated page stayed at zero opacity. It
+  compares in-view reveals after a hard load against the same route reached by
+  clicking.
+- `probe-arc.mjs` — samples the page's actual ground colour every ~160px of
+  scroll and counts how many samples land mid-transition. A hard block boundary
+  scores zero or one; the current sunrise scores nine.
 
 `test-webhook.mjs` signs payloads exactly as Stripe does, so the full order path
 is verifiable without a live Stripe account.

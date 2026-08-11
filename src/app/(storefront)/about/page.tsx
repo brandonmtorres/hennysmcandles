@@ -13,7 +13,7 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   return (
     <>
-      <header className="relative overflow-hidden border-b border-wax/8 bg-obsidian">
+      <header className="veil relative overflow-hidden border-b border-wax/8">
         {/* Individual edges — see the note in Hero.tsx on inset-0 conflicts. */}
         <div className="relative h-[38svh] min-h-[260px] w-full lg:absolute lg:bottom-0 lg:left-[50%] lg:right-0 lg:top-0 lg:h-auto lg:w-auto lg:min-h-0">
           <Image
@@ -43,7 +43,7 @@ export default function AboutPage() {
           <div className="max-w-[34rem]">
             <p className="label text-gild/90">Our story</p>
             <h1 className="display-lg mt-5 text-wax">
-              One person, <span className="italic text-gild">one pour at a time</span>
+              One person, <span className="script text-gild">one pour at a time</span>
             </h1>
             <p className="lede mt-6 max-w-[44ch]">
               Hennys M. Homemade Candles is not a factory with a founder&rsquo;s
@@ -53,7 +53,7 @@ export default function AboutPage() {
         </div>
       </header>
 
-      <LitSection glow className="bg-obsidian px-5 py-24 sm:px-8">
+      <LitSection glow className="veil-deep px-5 py-24 sm:px-8">
         <div className="relative mx-auto max-w-3xl">
           <blockquote className="reveal border-l border-gild/40 pl-7">
             <p className="font-[family-name:var(--font-display)] text-[clamp(1.5rem,3vw,2.25rem)] italic leading-[1.4] text-wax/92">

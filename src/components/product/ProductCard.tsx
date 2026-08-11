@@ -1,5 +1,5 @@
-import Image from 'next/image'
 import Link from 'next/link'
+import { Photo } from '@/components/visual/Photo'
 import { formatMoney } from '@/lib/money'
 import type { ProductCard as Product } from '@/lib/products'
 
@@ -28,7 +28,7 @@ export function ProductTile({
       <Link href={`/products/${product.slug}`} className="block focus-visible:outline-offset-8">
         <div className="relative aspect-[4/5] overflow-hidden bg-ash">
           {image ? (
-            <Image
+            <Photo
               src={image.url}
               alt={image.alt}
               fill
@@ -36,7 +36,7 @@ export function ProductTile({
               quality={82}
               sizes="(max-width: 639px) 88vw, (max-width: 1023px) 45vw, 30vw"
               className={[
-                'cinematic object-cover transition-transform duration-[1400ms] ease-[cubic-bezier(0.22,0.61,0.36,1)]',
+                'cinematic object-cover',
                 'group-hover:scale-[1.045]',
                 soldOut ? 'opacity-45 saturate-50' : '',
               ].join(' ')}
@@ -75,7 +75,11 @@ export function ProductTile({
           </div>
 
           {product.crystal ? (
-            <p className="label-sm absolute bottom-3.5 left-3.5 text-wax/75">
+            <p className="label-sm absolute bottom-3.5 left-3.5 flex items-center gap-2 text-wax/80">
+              <span
+                aria-hidden="true"
+                className="block h-[5px] w-[5px] rotate-45 bg-amethyst shadow-[0_0_10px_2px_rgba(124,106,156,0.65)]"
+              />
               {product.crystal}
             </p>
           ) : null}

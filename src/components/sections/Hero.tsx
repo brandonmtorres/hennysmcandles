@@ -17,7 +17,7 @@ import { pluralise, spell } from '@/lib/words'
  */
 export function Hero({ scentCount }: { scentCount: number }) {
   return (
-    <section className="relative overflow-hidden bg-obsidian lg:min-h-[100svh]">
+    <section className="relative overflow-hidden lg:min-h-[100svh]">
       {/* Photograph */}
       {/*
         Edges are set individually rather than with `inset-0` plus a `left`
@@ -33,31 +33,22 @@ export function Hero({ scentCount }: { scentCount: number }) {
           priority
           quality={88}
           sizes="(max-width: 1023px) 100vw, 56vw"
-          className="object-cover object-center contrast-[1.04] saturate-[0.97]"
+          /*
+            The photograph dissolves via a mask rather than being covered by a
+            painted scrim. A flat obsidian scrim would sit as a dead rectangle
+            over the living backdrop behind it; masking lets the night sky and
+            aurora show through the fade instead.
+          */
+          className="object-cover object-center contrast-[1.04] saturate-[0.97] [mask-image:linear-gradient(to_bottom,black_0%,black_62%,transparent_100%)] lg:[mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,0.18)_14%,rgba(0,0,0,0.72)_32%,black_58%)]"
         />
 
-        {/* Mobile: fade the base of the band into the type below it. */}
-        <div
-          aria-hidden="true"
-          className="absolute inset-x-0 bottom-0 h-36 bg-gradient-to-t from-obsidian via-obsidian/75 to-transparent lg:hidden"
-        />
-
-        {/* Desktop: hold solid obsidian across the seam, then release, so the
-            photograph has no visible left edge against the type column. */}
+        {/* A little extra depth top and bottom, kept translucent. */}
         <div
           aria-hidden="true"
           className="absolute inset-0 hidden lg:block"
           style={{
             background:
-              'linear-gradient(to right, #0b0b0f 0%, #0b0b0f 9%, rgba(11,11,15,0.82) 20%, rgba(11,11,15,0.34) 38%, rgba(11,11,15,0) 62%)',
-          }}
-        />
-        <div
-          aria-hidden="true"
-          className="absolute inset-0 hidden lg:block"
-          style={{
-            background:
-              'linear-gradient(to bottom, rgba(11,11,15,0.72) 0%, rgba(11,11,15,0) 26%, rgba(11,11,15,0) 68%, rgba(11,11,15,0.5) 100%)',
+              'linear-gradient(to bottom, rgba(6,6,8,0.55) 0%, rgba(6,6,8,0) 24%, rgba(6,6,8,0) 70%, rgba(6,6,8,0.45) 100%)',
           }}
         />
 
@@ -93,7 +84,7 @@ export function Hero({ scentCount }: { scentCount: number }) {
           <h1 className="display-xl rise mt-5 text-wax sm:mt-6">
             <span style={{ '--rise-delay': '120ms' } as React.CSSProperties}>Bring light</span>
             <span
-              className="italic text-gild"
+              className="script text-gild"
               style={{ '--rise-delay': '260ms' } as React.CSSProperties}
             >
               to your life

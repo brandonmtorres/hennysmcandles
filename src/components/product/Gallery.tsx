@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { useState } from 'react'
+import { Photo } from '@/components/visual/Photo'
 
 export function Gallery({
   images,
@@ -20,7 +21,7 @@ export function Gallery({
   return (
     <div>
       <div className="relative aspect-[4/5] overflow-hidden bg-ash">
-        <Image
+        <Photo
           key={current.url}
           src={current.url}
           alt={current.alt}

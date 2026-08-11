@@ -33,11 +33,11 @@ const FAQ = [
 export default function ContactPage() {
   return (
     <>
-      <header className="border-b border-wax/8 bg-obsidian px-5 pb-14 pt-16 sm:px-8 sm:pt-24">
+      <header className="veil border-b border-wax/8 px-5 pb-14 pt-16 sm:px-8 sm:pt-24">
         <div className="mx-auto max-w-7xl">
           <p className="label text-gild/90">Contact</p>
           <h1 className="display-lg mt-5 max-w-[16ch] text-wax">
-            Say <span className="italic text-gild">hello</span>
+            Say <span className="script text-gild">hello</span>
           </h1>
           <p className="lede mt-6 max-w-[48ch]">
             Questions about a scent, an order, or a custom batch go straight to Hennys.
@@ -46,7 +46,7 @@ export default function ContactPage() {
         </div>
       </header>
 
-      <section className="bg-obsidian px-5 py-20 sm:px-8">
+      <section className="veil-deep px-5 py-20 sm:px-8">
         <div className="mx-auto grid max-w-7xl gap-16 lg:grid-cols-[1fr_1fr] lg:gap-24">
           <ContactForm />
 

@@ -29,7 +29,7 @@ export default async function CheckoutSuccessPage({
     : null
 
   return (
-    <section className="relative flex min-h-[78svh] items-center overflow-hidden bg-obsidian px-5 py-24 sm:px-8">
+    <section className="veil relative flex min-h-[78svh] items-center overflow-hidden px-5 py-24 sm:px-8">
       <ClearCartOnMount />
 
       <div className="mx-auto w-full max-w-2xl text-center">
@@ -43,7 +43,7 @@ export default async function CheckoutSuccessPage({
 
         <p className="label mt-10 text-gild/90">Thank you</p>
         <h1 className="display-lg mt-5 text-wax">
-          Your order is <span className="italic text-gild">confirmed</span>
+          Your order is <span className="script text-gild">confirmed</span>
         </h1>
 
         <p className="lede mx-auto mt-6 max-w-[46ch]">

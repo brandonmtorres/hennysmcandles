@@ -23,7 +23,7 @@ const LEGAL = [
 
 export function Footer({ discountPercent }: { discountPercent: number }) {
   return (
-    <footer className="relative overflow-hidden border-t border-wax/10 bg-pitch">
+    <footer className="veil-deep relative overflow-hidden border-t border-wax/10">
       <div className="mx-auto max-w-7xl px-5 pb-10 pt-20 sm:px-8 sm:pt-24">
         <div className="grid gap-14 lg:grid-cols-[1.4fr_1fr_1fr_1.3fr]">
           <div>

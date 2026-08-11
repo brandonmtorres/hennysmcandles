@@ -31,13 +31,13 @@ export function Reviews({ reviews }: { reviews: ReviewItem[] }) {
 
   return (
     <LitSection
-      className="border-t border-wax/8 bg-pitch px-5 py-24 sm:px-8"
+      className="veil-deep border-t border-wax/8 px-5 py-24 sm:px-8"
       aria-labelledby="reviews-heading"
     >
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <h2 className="display-md reveal text-wax" id="reviews-heading">
-            In other people&rsquo;s <span className="italic text-gild">homes</span>
+            In other people&rsquo;s <span className="script text-gild">homes</span>
           </h2>
           <p className="label-sm reveal text-smoke">Verified buyers</p>
         </div>

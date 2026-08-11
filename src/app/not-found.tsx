@@ -2,14 +2,14 @@ import Link from 'next/link'
 
 export default function NotFound() {
   return (
-    <main className="flex min-h-[100svh] items-center justify-center bg-obsidian px-6 py-24 text-center">
+    <main className="flex min-h-[100svh] items-center justify-center bg-pitch px-6 py-24 text-center">
       <div className="max-w-md">
         <span className="block text-4xl" aria-hidden="true">
           ☾
         </span>
         <p className="label mt-9 text-gild/90">Page not found</p>
         <h1 className="display-lg mt-5 text-wax">
-          Nothing lit <span className="italic text-gild">here</span>
+          Nothing lit <span className="script text-gild">here</span>
         </h1>
         <p className="lede mt-5">
           This page has burned down. The collection is still glowing.

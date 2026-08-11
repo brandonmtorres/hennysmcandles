@@ -15,7 +15,7 @@ export function Collection({
   return (
     <LitSection
       glow
-      className="border-t border-wax/8 bg-obsidian px-5 py-24 sm:px-8 sm:py-32"
+      className="veil border-t border-wax/8 px-5 py-24 sm:px-8 sm:py-32"
       aria-labelledby="collection-heading"
     >
       <div className="relative mx-auto max-w-7xl">
@@ -26,7 +26,7 @@ export function Collection({
               <span id="collection-heading">
                 {spell(totalCount).replace(/^\w/, (c) => c.toUpperCase())}{' '}
                 {pluralise(totalCount, 'scent')},{' '}
-                <span className="italic text-gild">poured by hand</span>
+                <span className="script text-gild">poured by hand</span>
               </span>
             }
             lede="Each batch is small enough that Hennys sets every crystal herself. When a scent sells out, it stays out until the next pour."

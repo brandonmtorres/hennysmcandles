@@ -16,11 +16,11 @@ export default async function ProductsPage() {
 
   return (
     <>
-      <header className="border-b border-wax/8 bg-obsidian px-5 pb-16 pt-16 sm:px-8 sm:pb-20 sm:pt-24">
+      <header className="veil border-b border-wax/8 px-5 pb-16 pt-16 sm:px-8 sm:pb-20 sm:pt-24">
         <div className="mx-auto max-w-7xl">
           <p className="label text-gild/90">The collection</p>
           <h1 className="display-lg mt-5 max-w-[18ch] text-wax">
-            Every candle, <span className="italic text-gild">poured by hand</span>
+            Every candle, <span className="script text-gild">poured by hand</span>
           </h1>
           <p className="lede mt-6 max-w-[52ch]">
             Small batches, natural soy wax, and a raw crystal set into every surface.
@@ -29,7 +29,7 @@ export default async function ProductsPage() {
         </div>
       </header>
 
-      <LitSection glow className="bg-obsidian px-5 py-16 sm:px-8 sm:py-20">
+      <LitSection glow className="veil px-5 py-16 sm:px-8 sm:py-20">
         <div className="relative mx-auto max-w-7xl">
           {products.length === 0 ? (
             <div className="py-24 text-center">
