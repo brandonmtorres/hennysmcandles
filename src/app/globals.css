@@ -255,17 +255,17 @@
   pointer-events: none;
 
   /*
-   * Base night, warming toward a deep ember as the light approaches.
-   *
-   * The mix runs to 62% because a subtler figure was measurably invisible:
-   * sampling the page showed the ground moving only from rgb(11,11,14) to
-   * rgb(15,13,16) across the entire dawn ramp, which is why the arc read as
-   * "dark, then light" rather than as a sunrise.
+   * The sky. Both colours are written by ScrollChoreography from a sunrise
+   * palette, so this gradient travels through indigo, violet, plum, ember and
+   * amber on its way to dawn rather than fading from black to cream through
+   * mud. The horizon runs warmer than the zenith and lights earlier, which is
+   * what sells it as a sunrise rather than a brightness slider.
    */
-  background-color: color-mix(
-    in oklab,
-    var(--color-obsidian) calc(100% - var(--dawn) * 62%),
-    #7a5230
+  background: linear-gradient(
+    180deg,
+    var(--sky-zenith, #07070f) 0%,
+    color-mix(in oklab, var(--sky-zenith, #07070f) 55%, var(--sky-horizon, #0d0b16)) 52%,
+    var(--sky-horizon, #0d0b16) 100%
   );
 }
 
@@ -275,39 +275,33 @@
   inset: 0;
 
   background:
-    /* Warm bloom rising from below as dawn arrives. */
+    /* The sun's warmth gathering at the horizon before it arrives. */
     radial-gradient(
-      140% 90% at 50% 108%,
-      rgba(255, 158, 74, calc(var(--dawn) * 0.30)),
-      transparent 62%
+      130% 62% at 50% 104%,
+      rgba(255, 168, 92, calc(var(--dawn) * 0.34)),
+      transparent 64%
     ),
-    /* Amethyst aurora, always faintly present — the crystal in the wax. */
+    /* Amethyst aurora, drifting with the scroll — the crystal in the wax. */
       radial-gradient(
-        75% 55% at 12% calc(18% + var(--scroll-progress) * 30%),
-        rgba(124, 106, 156, 0.20),
+        72% 52% at 14% calc(16% + var(--scroll-progress) * 32%),
+        rgba(124, 106, 156, calc(0.26 - var(--dawn) * 0.16)),
         transparent 62%
       ),
     radial-gradient(
-      65% 48% at 88% calc(72% - var(--scroll-progress) * 34%),
-      rgba(139, 123, 168, 0.15),
+      62% 46% at 86% calc(74% - var(--scroll-progress) * 36%),
+      rgba(150, 120, 190, calc(0.20 - var(--dawn) * 0.12)),
       transparent 58%
-    ),
-    /* A cold blue cast at the very top of the night. */
-      radial-gradient(
-        90% 60% at 50% -10%,
-        rgba(58, 66, 104, calc(0.22 - var(--dawn) * 0.18)),
-        transparent 60%
-      );
+    );
 }
 
-/* A slow drift so the aurora never sits perfectly still. */
+/* A slow drift so the sky is never perfectly still. */
 .backdrop::after {
   content: '';
   position: absolute;
   inset: -20%;
   background: radial-gradient(
     38% 30% at 50% 50%,
-    rgba(200, 161, 90, calc(0.10 + var(--dawn) * 0.10)),
+    rgba(200, 161, 90, calc(0.08 + var(--dawn) * 0.14)),
     transparent 70%
   );
   animation: aurora 34s ease-in-out infinite alternate;
@@ -382,12 +376,29 @@
    * These were far heavier at first, which crushed the warming ground beneath
    * them and hid the whole effect.
    */
+  /*
+   * Dark sections are a veil over the sky, and they dissolve at top and bottom
+   * rather than ending on a line. With the sky now travelling through a full
+   * sunrise behind them, any hard-edged panel reads immediately as a seam.
+   */
   .veil {
-    background-color: color-mix(in oklab, var(--color-pitch) 16%, transparent);
+    background-image: linear-gradient(
+      180deg,
+      transparent 0px,
+      color-mix(in oklab, var(--color-pitch) 16%, transparent) 200px,
+      color-mix(in oklab, var(--color-pitch) 16%, transparent) calc(100% - 200px),
+      transparent 100%
+    );
   }
 
   .veil-deep {
-    background-color: color-mix(in oklab, var(--color-pitch) 30%, transparent);
+    background-image: linear-gradient(
+      180deg,
+      transparent 0px,
+      color-mix(in oklab, var(--color-pitch) 32%, transparent) 220px,
+      color-mix(in oklab, var(--color-pitch) 32%, transparent) calc(100% - 220px),
+      transparent 100%
+    );
   }
 
   /* A soft pool of candlelight, strongest where the light currently is. */

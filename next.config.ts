@@ -50,7 +50,9 @@ const nextConfig: NextConfig = {
   images: {
     formats: ['image/avif', 'image/webp'],
     deviceSizes: [360, 480, 640, 828, 1080, 1280, 1600, 1920],
-    qualities: [72, 82, 84, 86, 88],
+    // Every `quality` value used anywhere must be listed here — Next rejects
+    // an unlisted one with a 400 and the image simply does not render.
+    qualities: [72, 82, 84, 86, 88, 90],
   },
   async headers() {
     return [

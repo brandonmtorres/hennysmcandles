@@ -27,48 +27,55 @@ export function Hero({ scentCount }: { scentCount: number }) {
       */}
       <div className="relative h-[34svh] min-h-[252px] w-full lg:absolute lg:bottom-0 lg:left-[46%] lg:right-0 lg:top-0 lg:h-auto lg:w-auto lg:min-h-0">
         <Image
-          src="/images/products/black-sea-mist-lit.jpeg"
+          src="/images/products/black-sea-mist-hero.jpeg"
           alt="A Hennys M. Black Sea Mist candle burning beside a piece of raw black tourmaline"
           fill
           priority
-          quality={88}
-          sizes="(max-width: 1023px) 100vw, 56vw"
+          quality={90}
+          sizes="(max-width: 1023px) 100vw, 60vw"
           /*
-            The photograph dissolves via a mask rather than being covered by a
-            painted scrim. A flat obsidian scrim would sit as a dead rectangle
-            over the living backdrop behind it; masking lets the night sky and
-            aurora show through the fade instead.
+            The photograph dissolves via a mask rather than a painted scrim, so
+            the night sky behind shows through the fade. The desktop fade is
+            long and starts from nothing — a short, hard fade is what made the
+            two columns read as separate panels.
           */
-          className="object-cover object-center contrast-[1.04] saturate-[0.97] [mask-image:linear-gradient(to_bottom,black_0%,black_62%,transparent_100%)] lg:[mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,0.18)_14%,rgba(0,0,0,0.72)_32%,black_58%)]"
+          className="object-cover object-center contrast-[1.03] saturate-[0.97] [mask-image:linear-gradient(to_bottom,black_0%,black_58%,transparent_100%)] lg:[mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,0.06)_16%,rgba(0,0,0,0.28)_30%,rgba(0,0,0,0.62)_44%,rgba(0,0,0,0.88)_58%,black_72%)]"
         />
 
-        {/* A little extra depth top and bottom, kept translucent. */}
+        {/*
+          Depth at the top and bottom of the photograph. This carries the same
+          horizontal mask as the image — an unmasked overlay painted a dark
+          band starting exactly at the panel's left edge, which is what made
+          the two columns look like separate panels butted together.
+        */}
         <div
           aria-hidden="true"
-          className="absolute inset-0 hidden lg:block"
+          className="absolute inset-0 hidden lg:block lg:[mask-image:linear-gradient(to_right,transparent_0%,rgba(0,0,0,0.06)_16%,rgba(0,0,0,0.28)_30%,rgba(0,0,0,0.62)_44%,rgba(0,0,0,0.88)_58%,black_72%)]"
           style={{
             background:
-              'linear-gradient(to bottom, rgba(6,6,8,0.55) 0%, rgba(6,6,8,0) 24%, rgba(6,6,8,0) 70%, rgba(6,6,8,0.45) 100%)',
+              'linear-gradient(to bottom, rgba(6,6,8,0.45) 0%, rgba(6,6,8,0) 26%, rgba(6,6,8,0) 74%, rgba(6,6,8,0.35) 100%)',
           }}
-        />
-
-        {/* Embers lift from the flames within the band on mobile. */}
-        <Atmosphere
-          sourceX={0.5}
-          sourceY={0.68}
-          emberCount={14}
-          starCount={22}
-          className="lg:hidden"
         />
       </div>
 
-      {/* Embers and starfield across the whole frame on desktop. */}
+      {/*
+        A single ember field across the whole hero rather than one per column.
+        Embers are born at the flame on the right and drift left over the type,
+        which is what makes the two halves read as one frame.
+      */}
       <Atmosphere
-        sourceX={0.74}
-        sourceY={0.46}
-        emberCount={22}
-        starCount={44}
+        sourceX={0.78}
+        sourceY={0.52}
+        emberCount={26}
+        drift={-0.3}
         className="hidden lg:block"
+      />
+      <Atmosphere
+        sourceX={0.5}
+        sourceY={0.2}
+        emberCount={16}
+        drift={-0.12}
+        className="lg:hidden"
       />
 
       {/* Type */}
@@ -141,16 +148,6 @@ export function Hero({ scentCount }: { scentCount: number }) {
         </div>
       </div>
 
-      {/* Scroll cue */}
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 bottom-6 hidden justify-center lg:flex"
-      >
-        <span className="label-sm flex flex-col items-center gap-2 text-smoke/60">
-          Scroll
-          <span className="block h-10 w-px bg-gradient-to-b from-gild/60 to-transparent" />
-        </span>
-      </div>
     </section>
   )
 }

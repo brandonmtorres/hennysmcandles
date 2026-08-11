@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation'
 import { useEffect } from 'react'
+import { rgb, skyAt } from '@/lib/sky'
 
 /**
  * Drives the page's scroll behaviour from a single set of observers.
@@ -105,6 +106,14 @@ export function ScrollChoreography() {
       }
 
       root.style.setProperty('--dawn', dawn.toFixed(4))
+
+      // The sky's actual colour, sampled from a sunrise palette. Interpolating
+      // straight from night to cream went through mud; travelling through hue
+      // is what makes the page's theme visibly change rather than just
+      // brighten.
+      const { zenith, horizon } = skyAt(dawn)
+      root.style.setProperty('--sky-zenith', rgb(zenith))
+      root.style.setProperty('--sky-horizon', rgb(horizon))
 
       // Overall scroll progress, used for the parallax on the starfield.
       const max = document.body.scrollHeight - window.innerHeight

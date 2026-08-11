@@ -1,6 +1,5 @@
 import Image from 'next/image'
 import { ButtonLink } from '@/components/ui/Button'
-import { DawnDivider } from '@/components/visual/DawnDivider'
 
 /**
  * The page's one bright section — the point in the scroll where the light has
@@ -36,11 +35,9 @@ export function Ritual() {
          distance from the viewport centre to drive `--dawn`, so the whole
          document warms on approach and cools again afterwards. */
       data-dawn-anchor
-      className="dawnfall relative overflow-hidden px-5 text-obsidian sm:px-8"
+      className="relative overflow-hidden px-5 pb-32 pt-32 text-obsidian sm:px-8 sm:pb-40 sm:pt-44"
       aria-labelledby="ritual-heading"
     >
-      <DawnDivider phase="waxing" label="The light comes up" />
-
       <div className="mx-auto max-w-7xl">
         <div className="grid gap-14 lg:grid-cols-[1fr_1.15fr] lg:gap-20">
           <div className="lg:sticky lg:top-32 lg:self-start">
@@ -101,8 +98,6 @@ export function Ritual() {
           </ButtonLink>
         </div>
       </div>
-
-      <DawnDivider phase="waning" label="And the night returns" />
     </section>
   )
 }
