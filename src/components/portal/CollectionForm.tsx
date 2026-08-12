@@ -11,6 +11,9 @@ import {
 } from '@/app/store-portal/(app)/collections/actions'
 import { Card, Field, Input, PortalButton, Select, Textarea } from '@/components/portal/ui'
 import { slugify } from '@/lib/validation'
+import { SeasonalBanner } from '@/components/sections/SeasonalBanner'
+import { THEME_KEYS, getTheme, type ThemeKey } from '@/lib/themes'
+import type { ProductCard } from '@/lib/products'
 
 export type CollectionFormValues = {
   id: string | null
@@ -27,6 +30,10 @@ export type CollectionFormValues = {
   startsAt: string
   endsAt: string
   productIds: string[]
+  theme: string
+  bannerActive: boolean
+  bannerHeading: string
+  bannerBody: string
 }
 
 export type ProductOption = {
@@ -39,9 +46,12 @@ export type ProductOption = {
 export function CollectionForm({
   values,
   products,
+  previewProducts,
 }: {
   values: CollectionFormValues
   products: ProductOption[]
+  /** Full card data, so the preview renders the real banner rather than a mock. */
+  previewProducts: ProductCard[]
 }) {
   const action = saveCollection.bind(null, values.id)
   const [state, formAction] = useActionState<CollectionFormState, FormData>(action, {})
@@ -54,6 +64,10 @@ export function CollectionForm({
   const [salePercent, setSalePercent] = useState(values.salePercent)
   const [productIds, setProductIds] = useState<string[]>(values.productIds)
   const [search, setSearch] = useState('')
+  const [theme, setTheme] = useState<ThemeKey>(values.theme as ThemeKey)
+  const [bannerActive, setBannerActive] = useState(values.bannerActive)
+  const [bannerHeading, setBannerHeading] = useState(values.bannerHeading)
+  const [bannerBody, setBannerBody] = useState(values.bannerBody)
 
   const error = (key: string) => state.errors?.[key]
 
@@ -197,6 +211,125 @@ export function CollectionForm({
             />
           </Field>
         </div>
+      </Card>
+
+      <Card
+        title="Seasonal theme"
+        description="Dresses a band on the home page in seasonal colours, with a few small motifs and Hennys' cat tucked in the corner. Only one collection shows its banner at a time."
+      >
+        <input type="hidden" name="theme" value={theme} />
+
+        <ul className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          {THEME_KEYS.map((key) => {
+            const preset = getTheme(key)
+            const selected = theme === key
+            return (
+              <li key={key}>
+                <button
+                  type="button"
+                  onClick={() => setTheme(key)}
+                  aria-pressed={selected}
+                  className={[
+                    'flex w-full items-center gap-3 border p-2.5 text-left transition-colors',
+                    selected
+                      ? 'border-gild-deep/60 bg-gild/8'
+                      : 'border-rule bg-surface hover:border-ink/25',
+                  ].join(' ')}
+                >
+                  <span
+                    aria-hidden="true"
+                    className="block h-9 w-9 shrink-0 rounded-[2px] border border-black/10"
+                    style={
+                      preset
+                        ? {
+                            background: `linear-gradient(135deg, ${preset.from}, ${preset.to})`,
+                          }
+                        : { background: '#e7e1d5' }
+                    }
+                  />
+                  <span className="min-w-0">
+                    <span className="block truncate text-[13.5px] text-ink">
+                      {preset?.label ?? 'No theme'}
+                    </span>
+                    <span className="block truncate text-[11px] text-ink-soft">
+                      {preset?.season ?? 'Plain — no banner'}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            )
+          })}
+        </ul>
+
+        {theme !== 'NONE' ? (
+          <>
+            <label className="mt-6 flex cursor-pointer items-center gap-3 border-t border-rule pt-6">
+              <input
+                type="checkbox"
+                name="bannerActive"
+                checked={bannerActive}
+                onChange={(e) => setBannerActive(e.target.checked)}
+                className="h-4 w-4 accent-[#9a7838]"
+              />
+              <span className="text-[14px] text-ink">
+                Show this banner on the home page
+              </span>
+            </label>
+
+            <div className="mt-5 grid gap-5 sm:grid-cols-2">
+              <Field
+                label="Heading"
+                htmlFor="bannerHeading"
+                hint="Leave blank to use the theme's own wording."
+              >
+                <Input
+                  id="bannerHeading"
+                  name="bannerHeading"
+                  value={bannerHeading}
+                  onChange={(e) => setBannerHeading(e.target.value)}
+                  maxLength={120}
+                  placeholder={getTheme(theme)?.heading}
+                />
+              </Field>
+              <Field label="Supporting line" htmlFor="bannerBody">
+                <Input
+                  id="bannerBody"
+                  name="bannerBody"
+                  value={bannerBody}
+                  onChange={(e) => setBannerBody(e.target.value)}
+                  maxLength={300}
+                  placeholder={getTheme(theme)?.body}
+                />
+              </Field>
+            </div>
+
+            {/* The real banner component, at reduced scale — what is approved
+                here is exactly what customers get. */}
+            <div className="mt-6 border-t border-rule pt-6">
+              <p className="mb-3 text-[11px] uppercase tracking-[0.16em] text-ink-soft">
+                Preview
+              </p>
+              <SeasonalBanner
+                preview
+                data={{
+                  slug,
+                  name: name || 'this collection',
+                  theme,
+                  bannerHeading,
+                  bannerBody,
+                  salePercent,
+                  saleActive,
+                  products: previewProducts.filter((p) => productIds.includes(p.id)),
+                }}
+              />
+              {productIds.length === 0 ? (
+                <p className="mt-2.5 text-[12.5px] text-ink-soft">
+                  Pick some candles below and they will appear in the banner.
+                </p>
+              ) : null}
+            </div>
+          </>
+        ) : null}
       </Card>
 
       <Card

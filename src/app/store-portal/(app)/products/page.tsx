@@ -56,7 +56,7 @@ export default async function ProductsAdminPage({
       ) : (
         <div className="border border-rule bg-surface">
           {/* Column headings, desktop only — the cards carry their own labels below lg. */}
-          <div className="hidden border-b border-rule px-5 py-3 lg:grid lg:grid-cols-[auto_1fr_7rem_9rem_10rem_5rem] lg:items-center lg:gap-4">
+          <div className="hidden border-b border-rule px-5 py-3 lg:grid lg:grid-cols-[auto_1fr_7rem_12.5rem_10rem_5rem] lg:items-center lg:gap-4">
             {['', 'Candle', 'Price', 'In stock', 'Shown on shop', ''].map((heading, i) => (
               <span
                 key={i}

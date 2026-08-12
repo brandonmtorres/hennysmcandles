@@ -87,6 +87,37 @@ export async function getStorefrontCollections(now = new Date()) {
   })
 }
 
+/** The collection currently dressing the home page, if any. */
+export async function getActiveBanner(now = new Date()) {
+  const collection = await db.collection.findFirst({
+    where: {
+      ...storefrontCollectionWhere(now),
+      bannerActive: true,
+      NOT: { theme: 'NONE' },
+    },
+    orderBy: [{ sortOrder: 'asc' }, { updatedAt: 'desc' }],
+    include: withProducts,
+  })
+  if (!collection) return null
+
+  return {
+    slug: collection.slug,
+    name: collection.name,
+    theme: collection.theme,
+    bannerHeading: collection.bannerHeading,
+    bannerBody: collection.bannerBody,
+    salePercent: collection.salePercent,
+    saleActive: collection.saleActive,
+    products: collection.products
+      .filter(
+        (link) =>
+          link.product.visibility === 'VISIBLE' ||
+          (link.product.visibility === 'AUTO' && link.product.stock > 0),
+      )
+      .map((link) => toCardWithPromos(link.product, [collection], now)),
+  }
+}
+
 export async function getFeaturedCollections(limit = 2, now = new Date()) {
   const rows = await db.collection.findMany({
     where: { ...storefrontCollectionWhere(now), featured: true },

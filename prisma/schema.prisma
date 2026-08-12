@@ -85,6 +85,14 @@ model Collection {
   featured  Boolean @default(false)
   sortOrder Int     @default(0)
 
+  /// Seasonal dressing for the home-page banner.
+  /// "NONE" | "FALL" | "CHRISTMAS" | "SUMMER" | "VALENTINES" | "MOTHERS_DAY"
+  theme        String  @default("NONE")
+  bannerActive Boolean @default(false)
+  /// Overrides the theme's own wording when the owner wants something specific.
+  bannerHeading String @default("")
+  bannerBody    String @default("")
+
   imageUrl String?
 
   products ProductCollection[]
@@ -245,6 +253,53 @@ model Setting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+/// A discount code a customer types at checkout.
+model PromoCode {
+  id   String @id @default(cuid())
+  /// Stored upper-case; lookups normalise, so entry is case-insensitive.
+  code String @unique
+
+  /// "PERCENT" | "FIXED"
+  kind  String @default("PERCENT")
+  /// Percent off (1–90) or a fixed amount in cents, depending on `kind`.
+  value Int
+
+  /// Order subtotal, in cents, required before the code applies.
+  minSubtotalCents Int @default(0)
+
+  /// Total redemptions allowed across all customers. 0 means unlimited.
+  maxRedemptions Int @default(0)
+  timesRedeemed  Int @default(0)
+
+  active   Boolean   @default(true)
+  startsAt DateTime?
+  endsAt   DateTime?
+
+  note String @default("")
+
+  redemptions PromoRedemption[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([active])
+}
+
+/// One use of a code, recorded when the Stripe webhook confirms payment.
+model PromoRedemption {
+  id            String @id @default(cuid())
+  promoCodeId   String
+  orderNumber   String
+  discountCents Int
+  email         String?
+
+  promoCode PromoCode @relation(fields: [promoCodeId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@index([promoCodeId, createdAt])
 }
 
 model NewsletterSubscriber {

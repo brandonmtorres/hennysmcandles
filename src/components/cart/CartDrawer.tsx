@@ -15,6 +15,13 @@ export function CartDrawer({
   const { lines, isOpen, close, setQuantity, remove, subtotalCents, count } = useCart()
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // The promo code is only ever a preview here. The server re-checks it when
+  // the Stripe session is created, so a tampered discount changes nothing.
+  const [code, setCode] = useState('')
+  const [promo, setPromo] = useState<{ code: string; discountCents: number } | null>(null)
+  const [promoError, setPromoError] = useState<string | null>(null)
+  const [checkingPromo, setCheckingPromo] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
   const closeRef = useRef<HTMLButtonElement>(null)
 
@@ -58,6 +65,38 @@ export function CartDrawer({
       ? Math.min(100, (subtotalCents / freeShippingThresholdCents) * 100)
       : 100
 
+  async function applyCode() {
+    if (!code.trim() || checkingPromo) return
+    setCheckingPromo(true)
+    setPromoError(null)
+    try {
+      const response = await fetch('/api/promo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code,
+          items: lines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
+        }),
+      })
+      const payload = (await response.json()) as {
+        code?: string
+        discountCents?: number
+        error?: string
+      }
+      if (!response.ok || !payload.code) {
+        setPromo(null)
+        setPromoError(payload.error ?? 'That code did not work.')
+        return
+      }
+      setPromo({ code: payload.code, discountCents: payload.discountCents ?? 0 })
+      setCode('')
+    } catch {
+      setPromoError('We could not check that code. Try again.')
+    } finally {
+      setCheckingPromo(false)
+    }
+  }
+
   async function checkout() {
     setSubmitting(true)
     setError(null)
@@ -66,8 +105,10 @@ export function CartDrawer({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          // Only identifiers and quantities are sent. The server prices the order.
+          // Only identifiers, quantities and the code are sent. The server
+          // prices the order and re-validates the code.
           items: lines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
+          ...(promo ? { code: promo.code } : {}),
         }),
       })
 
@@ -253,12 +294,88 @@ export function CartDrawer({
                 </div>
               ) : null}
 
+              {/* Promo code */}
+              <div className="mb-5 border-t border-wax/10 pt-5">
+                {promo ? (
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="flex min-w-0 items-center gap-2">
+                      <span
+                        aria-hidden="true"
+                        className="block h-[5px] w-[5px] shrink-0 rotate-45 bg-gild"
+                      />
+                      <span className="truncate font-mono text-[12px] tracking-[0.06em] text-gild">
+                        {promo.code}
+                      </span>
+                      <span className="shrink-0 text-[12.5px] text-smoke">
+                        −{formatMoney(promo.discountCents)}
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setPromo(null)}
+                      tabIndex={isOpen ? 0 : -1}
+                      className="label-sm shrink-0 text-smoke transition-colors hover:text-wax"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <label htmlFor="promo-code" className="label-sm mb-2.5 block text-smoke">
+                      Have a code?
+                    </label>
+                    <div className="flex items-stretch border-b border-wax/22 transition-colors focus-within:border-gild">
+                      <input
+                        id="promo-code"
+                        value={code}
+                        onChange={(e) => {
+                          setCode(e.target.value.toUpperCase())
+                          if (promoError) setPromoError(null)
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            void applyCode()
+                          }
+                        }}
+                        placeholder="MIDWINTER15"
+                        maxLength={40}
+                        tabIndex={isOpen ? 0 : -1}
+                        aria-invalid={Boolean(promoError)}
+                        aria-describedby={promoError ? 'promo-error' : undefined}
+                        className="h-10 w-full min-w-0 bg-transparent font-mono text-[13px] tracking-[0.06em] text-wax placeholder:font-sans placeholder:tracking-normal placeholder:text-smoke/50 focus:outline-none"
+                      />
+                      <button
+                        type="button"
+                        onClick={applyCode}
+                        disabled={checkingPromo || !code.trim()}
+                        tabIndex={isOpen ? 0 : -1}
+                        className="label-sm shrink-0 pl-4 text-gild transition-opacity hover:opacity-70 disabled:opacity-35"
+                      >
+                        {checkingPromo ? 'Checking…' : 'Apply'}
+                      </button>
+                    </div>
+                    {promoError ? (
+                      <p id="promo-error" role="alert" className="mt-2 text-[12px] text-danger">
+                        {promoError}
+                      </p>
+                    ) : null}
+                  </>
+                )}
+              </div>
+
               <div className="flex items-baseline justify-between">
                 <span className="label text-smoke">Subtotal</span>
                 <span className="font-[family-name:var(--font-display)] text-2xl tabular-nums text-wax">
-                  {formatMoney(subtotalCents)}
+                  {formatMoney(Math.max(0, subtotalCents - (promo?.discountCents ?? 0)))}
                 </span>
               </div>
+              {promo ? (
+                <p className="mt-1 text-right text-[12px] text-smoke">
+                  <span className="line-through">{formatMoney(subtotalCents)}</span> before
+                  your code
+                </p>
+              ) : null}
               <p className="mt-1.5 text-[11.5px] text-smoke">
                 Shipping and taxes are calculated at checkout.
               </p>

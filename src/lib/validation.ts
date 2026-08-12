@@ -28,6 +28,8 @@ export const checkoutItemSchema = z.object({
 
 export const checkoutRequestSchema = z.object({
   items: z.array(checkoutItemSchema).min(1, 'Your cart is empty.').max(30),
+  /** Optional promo code; always re-validated server-side before use. */
+  code: z.string().trim().max(40).optional(),
 })
 
 export const loginSchema = z.object({

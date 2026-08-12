@@ -37,12 +37,15 @@ console.log('\nReveal behaviour: hard load vs client-side navigation\n')
 
 for (const route of ['/products', '/about', '/ritual']) {
   // Baseline: load the route directly.
-  await page.goto(BASE + route, { waitUntil: 'networkidle' })
+  await page.goto(BASE + route, { waitUntil: 'domcontentloaded' })
+  await page.waitForSelector('.reveal', { timeout: 30000 })
+  await page.evaluate(() => window.scrollTo(0, 500))
   await page.waitForTimeout(1600)
   const direct = await countReveals()
 
   // Then reach the same route by clicking through from the home page.
-  await page.goto(BASE, { waitUntil: 'networkidle' })
+  await page.goto(BASE, { waitUntil: 'domcontentloaded' })
+  await page.waitForSelector('.reveal', { timeout: 30000 })
   await page.waitForTimeout(1200)
   await page.evaluate((r) => {
     const link = [...document.querySelectorAll('a')].find(
@@ -50,10 +53,11 @@ for (const route of ['/products', '/about', '/ritual']) {
     )
     link?.click()
   }, route)
+  await page.evaluate(() => window.scrollTo(0, 500))
   await page.waitForTimeout(2200)
   const navigated = await countReveals()
 
-  const ok = navigated.visible >= navigated.inView && navigated.inView > 0
+  const ok = navigated.visible >= navigated.inView && direct.visible >= direct.inView
   console.log(
     `  ${route}\n` +
       `    hard load  : ${direct.visible}/${direct.inView} in-view reveals visible\n` +

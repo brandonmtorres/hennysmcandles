@@ -51,7 +51,7 @@ export function ProductRow({ product }: { product: Row }) {
 
   return (
     <li className="px-5 py-4">
-      <div className="grid gap-4 lg:grid-cols-[auto_1fr_7rem_9rem_10rem_5rem] lg:items-center">
+      <div className="grid gap-4 lg:grid-cols-[auto_1fr_7rem_12.5rem_10rem_5rem] lg:items-center">
         {/* Thumbnail */}
         <div className="relative hidden h-14 w-12 shrink-0 overflow-hidden bg-parchment lg:block">
           {product.image ? (
@@ -91,7 +91,7 @@ export function ProductRow({ product }: { product: Row }) {
         </div>
 
         {/* Stock */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
           <span className="text-[10.5px] uppercase tracking-[0.16em] text-ink-soft lg:hidden">
             Stock
           </span>

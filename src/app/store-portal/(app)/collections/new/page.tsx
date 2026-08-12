@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { db } from '@/lib/db'
 import { formatMoney } from '@/lib/money'
+import { toCard } from '@/lib/products'
 import { CollectionForm } from '@/components/portal/CollectionForm'
 
 export const dynamic = 'force-dynamic'
@@ -9,7 +10,10 @@ export const metadata = { title: 'New collection' }
 export default async function NewCollectionPage() {
   const products = await db.product.findMany({
     orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-    include: { images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
+    include: {
+      images: { orderBy: { sortOrder: 'asc' } },
+      collections: { include: { collection: true } },
+    },
   })
 
   return (
@@ -42,6 +46,10 @@ export default async function NewCollectionPage() {
           startsAt: '',
           endsAt: '',
           productIds: [],
+          theme: 'NONE',
+          bannerActive: false,
+          bannerHeading: '',
+          bannerBody: '',
         }}
         products={products.map((p) => ({
           id: p.id,
@@ -49,6 +57,7 @@ export default async function NewCollectionPage() {
           image: p.images[0]?.url ?? null,
           priceLabel: formatMoney(p.priceCents),
         }))}
+        previewProducts={products.map((p) => toCard(p))}
       />
     </>
   )

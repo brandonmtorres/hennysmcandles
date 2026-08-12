@@ -184,6 +184,28 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
       where: { id: { in: items.map((i) => i.productId) }, stock: { lt: 0 } },
       data: { stock: 0 },
     })
+
+    // A promo code is counted only once payment has actually succeeded, and
+    // inside the same transaction as the order — so a redemption can never be
+    // recorded for an order that failed to save, or vice versa.
+    const promoCodeId = session.metadata?.promoCodeId
+    if (promoCodeId && discountCents > 0) {
+      const promo = await tx.promoCode.findUnique({ where: { id: promoCodeId } })
+      if (promo) {
+        await tx.promoCode.update({
+          where: { id: promoCodeId },
+          data: { timesRedeemed: { increment: 1 } },
+        })
+        await tx.promoRedemption.create({
+          data: {
+            promoCodeId,
+            orderNumber,
+            discountCents,
+            email: session.customer_details?.email ?? null,
+          },
+        })
+      }
+    }
   })
 
   await sendOrderEmails({

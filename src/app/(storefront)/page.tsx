@@ -6,13 +6,15 @@ import { WhatsInside } from '@/components/sections/WhatsInside'
 import { Ritual } from '@/components/sections/Ritual'
 import { MeetHennys } from '@/components/sections/MeetHennys'
 import { Reviews } from '@/components/sections/Reviews'
+import { SeasonalBanner } from '@/components/sections/SeasonalBanner'
+import { getActiveBanner } from '@/lib/collections'
 
 // Catalogue and stock change from the portal, so the page is rendered per
 // request rather than cached at build time.
 export const dynamic = 'force-dynamic'
 
 export default async function HomePage() {
-  const [featured, all, reviews] = await Promise.all([
+  const [featured, all, reviews, banner] = await Promise.all([
     getFeaturedProducts(6),
     getStorefrontProducts(),
     db.review.findMany({
@@ -20,6 +22,7 @@ export default async function HomePage() {
       orderBy: { createdAt: 'desc' },
       take: 3,
     }),
+    getActiveBanner(),
   ])
 
   // Lead with whatever is flagged as featured, then top up from the rest of the
@@ -34,6 +37,7 @@ export default async function HomePage() {
   return (
     <>
       <Hero scentCount={all.length} />
+      {banner ? <SeasonalBanner data={banner} /> : null}
       <Collection products={showcase} totalCount={all.length} />
       <WhatsInside />
       <Ritual />

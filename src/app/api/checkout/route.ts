@@ -4,6 +4,7 @@ import { getStripe, isStripeConfigured } from '@/lib/stripe'
 import { effectivePriceCents } from '@/lib/money'
 import { getSettings, shippingCentsFor } from '@/lib/settings'
 import { checkoutRequestSchema } from '@/lib/validation'
+import { checkPromoCode } from '@/lib/promo'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -134,8 +135,40 @@ export async function POST(request: Request) {
 
   const shippingCents = shippingCentsFor(subtotalCents, settings)
 
+  // The promo code is re-validated here against a subtotal computed from the
+  // database. Whatever the cart previewed is irrelevant — this is the number
+  // Stripe is told to charge.
+  let promo: { id: string; code: string; discountCents: number } | null = null
+  if (parsed.data.code) {
+    const result = await checkPromoCode(parsed.data.code, subtotalCents)
+    if (!result.ok) {
+      return NextResponse.json({ error: result.reason }, { status: 422 })
+    }
+    promo = { id: result.id, code: result.code, discountCents: result.discountCents }
+  }
+
   try {
     const stripe = getStripe()
+
+    // Stripe applies discounts through a coupon, so one is created per order
+    // for the exact amount. Creating it fresh keeps our rules — minimum spend,
+    // redemption limits, dates — the single source of truth rather than
+    // duplicating them into Stripe's own promotion objects.
+    const discounts = promo
+      ? [
+          {
+            coupon: (
+              await stripe.coupons.create({
+                amount_off: promo.discountCents,
+                currency: settings.currency,
+                duration: 'once',
+                name: `${promo.code}`,
+                metadata: { promoCodeId: promo.id, code: promo.code },
+              })
+            ).id,
+          },
+        ]
+      : undefined
     const session = await stripe.checkout.sessions.create({
       mode: 'payment',
       line_items: lineItems,
@@ -154,6 +187,7 @@ export async function POST(request: Request) {
           },
         },
       ],
+      discounts,
       phone_number_collection: { enabled: false },
       success_url: `${siteUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${siteUrl}/products`,
@@ -165,6 +199,7 @@ export async function POST(request: Request) {
             q: item.quantity,
           })),
         ),
+        ...(promo ? { promoCodeId: promo.id, promoCode: promo.code } : {}),
       },
     })
 

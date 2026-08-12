@@ -23,6 +23,10 @@ const collectionSchema = z.object({
   featured: z.boolean(),
   sortOrder: z.number().int().min(0).max(9999),
   imageUrl: z.string().trim().max(300).default(''),
+  theme: z.enum(['NONE', 'FALL', 'CHRISTMAS', 'SUMMER', 'VALENTINES', 'MOTHERS_DAY']),
+  bannerActive: z.boolean(),
+  bannerHeading: z.string().trim().max(120).default(''),
+  bannerBody: z.string().trim().max(300).default(''),
 })
 
 /** Datetime-local values arrive as "2026-08-12T09:00" or empty. */
@@ -54,6 +58,11 @@ export async function saveCollection(
     featured: formData.get('featured') === 'on',
     sortOrder: Number.parseInt(text('sortOrder'), 10) || 0,
     imageUrl: text('imageUrl'),
+    theme: text('theme') || 'NONE',
+    // A banner without a theme has nothing to draw, so the two travel together.
+    bannerActive: formData.get('bannerActive') === 'on' && text('theme') !== 'NONE',
+    bannerHeading: text('bannerHeading'),
+    bannerBody: text('bannerBody'),
   })
 
   if (!parsed.success) return { errors: fieldErrors(parsed.error) }
@@ -114,6 +123,15 @@ export async function saveCollection(
       entity: 'collection',
       entityId: created.id,
       meta: { name: data.name },
+    })
+  }
+
+  // Only one banner dresses the home page at a time — turning this one on
+  // stands the others down rather than leaving the choice ambiguous.
+  if (savedId && data.bannerActive) {
+    await db.collection.updateMany({
+      where: { NOT: { id: savedId }, bannerActive: true },
+      data: { bannerActive: false },
     })
   }
 

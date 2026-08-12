@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
 import { formatMoney } from '@/lib/money'
+import { toCard } from '@/lib/products'
 import { CollectionForm } from '@/components/portal/CollectionForm'
 
 export const dynamic = 'force-dynamic'
@@ -34,7 +35,10 @@ export default async function EditCollectionPage({ params }: Params) {
     }),
     db.product.findMany({
       orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
-      include: { images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
+      include: {
+        images: { orderBy: { sortOrder: 'asc' } },
+        collections: { include: { collection: true } },
+      },
     }),
   ])
 
@@ -80,6 +84,10 @@ export default async function EditCollectionPage({ params }: Params) {
           startsAt: toLocalInput(collection.startsAt),
           endsAt: toLocalInput(collection.endsAt),
           productIds: collection.products.map((p) => p.productId),
+          theme: collection.theme,
+          bannerActive: collection.bannerActive,
+          bannerHeading: collection.bannerHeading,
+          bannerBody: collection.bannerBody,
         }}
         products={products.map((p) => ({
           id: p.id,
@@ -87,6 +95,7 @@ export default async function EditCollectionPage({ params }: Params) {
           image: p.images[0]?.url ?? null,
           priceLabel: formatMoney(p.priceCents),
         }))}
+        previewProducts={products.map((p) => toCard(p))}
       />
     </>
   )
