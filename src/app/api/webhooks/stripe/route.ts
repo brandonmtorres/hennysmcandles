@@ -3,6 +3,7 @@ import type Stripe from 'stripe'
 import { db } from '@/lib/db'
 import { getStripe } from '@/lib/stripe'
 import { getSettings } from '@/lib/settings'
+import { effectivePriceCents } from '@/lib/money'
 import { sendEmail } from '@/lib/email/send'
 import {
   lowStockEmail,
@@ -102,6 +103,7 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
 
   const products = await db.product.findMany({
     where: { id: { in: cart.map((c) => c.id) } },
+    include: { collections: { include: { collection: true } } },
   })
   const byId = new Map(products.map((p) => [p.id, p]))
 
@@ -128,10 +130,13 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     .map((line) => {
       const product = byId.get(line.id)
       if (!product) return null
-      const unit =
-        product.onSale && product.salePercent > 0
-          ? Math.round(product.priceCents * (1 - product.salePercent / 100))
-          : product.priceCents
+      // The shared helper, not a local copy: this had drifted out of step with
+      // the checkout builder once collections gained their own promotions, so
+      // the stored order would have disagreed with what Stripe charged.
+      const unit = effectivePriceCents(
+        product,
+        product.collections.map((link) => link.collection),
+      )
       return {
         productId: product.id,
         name: product.name,

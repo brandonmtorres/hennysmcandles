@@ -8,6 +8,7 @@ import { signOut } from '@/app/store-portal/login/actions'
 const LINKS = [
   { href: '/store-portal', label: 'Dashboard', exact: true },
   { href: '/store-portal/products', label: 'Products', badge: 'products' as const },
+  { href: '/store-portal/collections', label: 'Collections' },
   { href: '/store-portal/orders', label: 'Orders', badge: 'orders' as const },
   { href: '/store-portal/settings', label: 'Settings' },
   { href: '/store-portal/security', label: 'Security' },

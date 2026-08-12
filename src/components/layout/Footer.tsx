@@ -4,6 +4,7 @@ import { NewsletterForm } from '@/components/layout/NewsletterForm'
 
 const SHOP = [
   { href: '/products', label: 'All candles' },
+  { href: '/collections', label: 'Collections' },
   { href: '/products/black-sea-mist', label: 'Black Sea Mist' },
   { href: '/products/moonlit-snow', label: 'Moonlit Snow' },
   { href: '/products/amethyst-moon', label: 'Amethyst Moon' },

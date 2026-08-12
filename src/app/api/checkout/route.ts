@@ -55,9 +55,16 @@ export async function POST(request: Request) {
     quantities.set(item.productId, (quantities.get(item.productId) ?? 0) + item.quantity)
   }
 
+  // Collections are loaded with the products so a live promotion is priced in
+  // here exactly as it was shown on the product page. Pricing the cart from a
+  // different query than the storefront is how a shop ends up charging more
+  // than it advertised.
   const products = await db.product.findMany({
     where: { id: { in: [...quantities.keys()] } },
-    include: { images: { orderBy: { sortOrder: 'asc' }, take: 1 } },
+    include: {
+      images: { orderBy: { sortOrder: 'asc' }, take: 1 },
+      collections: { include: { collection: true } },
+    },
   })
 
   if (products.length === 0) {
@@ -100,7 +107,10 @@ export async function POST(request: Request) {
       )
     }
 
-    const unitAmount = effectivePriceCents(product)
+    const unitAmount = effectivePriceCents(
+      product,
+      product.collections.map((link) => link.collection),
+    )
     subtotalCents += unitAmount * quantity
 
     lineItems.push({

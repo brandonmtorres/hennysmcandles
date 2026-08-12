@@ -18,10 +18,19 @@ export async function generateMetadata({ params }: Params) {
 
 export default async function EditProductPage({ params }: Params) {
   const { id } = await params
-  const product = await db.product.findUnique({
-    where: { id },
-    include: { images: { orderBy: { sortOrder: 'asc' } } },
-  })
+  const [product, collections] = await Promise.all([
+    db.product.findUnique({
+      where: { id },
+      include: {
+        images: { orderBy: { sortOrder: 'asc' } },
+        collections: { select: { collectionId: true } },
+      },
+    }),
+    db.collection.findMany({
+      orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+      select: { id: true, name: true, saleActive: true, salePercent: true },
+    }),
+  ])
   if (!product) notFound()
 
   return (
@@ -76,7 +85,9 @@ export default async function EditProductPage({ params }: Params) {
           featured: product.featured,
           sortOrder: product.sortOrder,
           images: product.images.map((i) => ({ url: i.url, alt: i.alt })),
+          collectionIds: product.collections.map((c) => c.collectionId),
         }}
+        collections={collections}
       />
     </>
   )

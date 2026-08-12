@@ -16,6 +16,8 @@ import {
   Select,
   Textarea,
 } from '@/components/portal/ui'
+import { ImageUploader, type UploadedImage } from '@/components/portal/ImageUploader'
+import { slugify } from '@/lib/validation'
 
 export type ProductFormValues = {
   id: string | null
@@ -43,18 +45,38 @@ export type ProductFormValues = {
   ingredients: string
   featured: boolean
   sortOrder: number
-  images: { url: string; alt: string }[]
+  images: UploadedImage[]
+  collectionIds: string[]
 }
 
-export function ProductForm({ values }: { values: ProductFormValues }) {
+export type CollectionOption = {
+  id: string
+  name: string
+  saleActive: boolean
+  salePercent: number
+}
+
+export function ProductForm({
+  values,
+  collections,
+}: {
+  values: ProductFormValues
+  collections: CollectionOption[]
+}) {
   const action = saveProduct.bind(null, values.id)
   const [state, formAction] = useActionState<ProductFormState, FormData>(action, {})
   const [onSale, setOnSale] = useState(values.onSale)
   const [salePercent, setSalePercent] = useState(values.salePercent)
   const [price, setPrice] = useState(values.price)
-  const [images, setImages] = useState(
-    values.images.length > 0 ? values.images : [{ url: '', alt: '' }],
-  )
+  const [images, setImages] = useState<UploadedImage[]>(values.images)
+  const [collectionIds, setCollectionIds] = useState<string[]>(values.collectionIds)
+
+  const [name, setName] = useState(values.name)
+  const [slug, setSlug] = useState(values.slug)
+  // The slug follows the name until the owner edits it directly, after which
+  // it is theirs. Silently rewriting a hand-set address would change a live
+  // URL out from under them.
+  const [slugEdited, setSlugEdited] = useState(values.slug.length > 0)
 
   const error = (key: string) => state.errors?.[key]
 
@@ -74,7 +96,11 @@ export function ProductForm({ values }: { values: ProductFormValues }) {
             <Input
               id="name"
               name="name"
-              defaultValue={values.name}
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value)
+                if (!slugEdited) setSlug(slugify(e.target.value))
+              }}
               required
               maxLength={120}
               placeholder="Black Sea Mist"
@@ -85,15 +111,40 @@ export function ProductForm({ values }: { values: ProductFormValues }) {
             label="Web address"
             htmlFor="slug"
             error={error('slug')}
-            hint="Leave blank to build it from the name."
+            hint={
+              slugEdited
+                ? 'Customers will find this candle at /products/' + (slug || '…')
+                : 'Filling in from the name. Type here to set it yourself.'
+            }
           >
-            <Input
-              id="slug"
-              name="slug"
-              defaultValue={values.slug}
-              maxLength={80}
-              placeholder="black-sea-mist"
-            />
+            <div className="flex items-center gap-2">
+              <span className="shrink-0 text-[13px] text-ink-soft">/products/</span>
+              <Input
+                id="slug"
+                name="slug"
+                value={slug}
+                onChange={(e) => {
+                  setSlug(e.target.value)
+                  setSlugEdited(true)
+                }}
+                maxLength={80}
+                placeholder="black-sea-mist"
+              />
+              {slugEdited && values.id === null ? (
+                <PortalButton
+                  type="button"
+                  tone="ghost"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={() => {
+                    setSlugEdited(false)
+                    setSlug(slugify(name))
+                  }}
+                >
+                  Reset
+                </PortalButton>
+              ) : null}
+            </div>
           </Field>
 
           <Field
@@ -362,76 +413,78 @@ export function ProductForm({ values }: { values: ProductFormValues }) {
 
       <Card
         title="Photographs"
-        description="Paths to images in the public folder, for example /images/products/black-sea-mist.jpeg. The first is used on the card."
+        description="Drag images straight in from your desktop, or paste them. The first one is used on the product card."
+      >
+        {/* Serialised as JSON so order and alt text survive the round trip
+            together — the previous newline-delimited paths could not carry
+            both reliably. */}
+        <input type="hidden" name="images" value={JSON.stringify(images)} />
+        <ImageUploader value={images} onChange={setImages} />
+      </Card>
+
+      <Card
+        title="Collections"
+        description="Group this candle into a seasonal edit or a promotion. A collection running a sale discounts everything inside it."
       >
         <input
           type="hidden"
-          name="images"
-          value={images.map((i) => i.url).filter(Boolean).join('\n')}
+          name="collectionIds"
+          value={collectionIds.join(',')}
         />
 
-        <div className="flex flex-col gap-4">
-          {images.map((image, index) => (
-            <div key={index} className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-              <Field label={`Image ${index + 1}`} htmlFor={`image-url-${index}`}>
-                <Input
-                  id={`image-url-${index}`}
-                  value={image.url}
-                  onChange={(e) =>
-                    setImages((current) =>
-                      current.map((img, i) =>
-                        i === index ? { ...img, url: e.target.value } : img,
-                      ),
-                    )
-                  }
-                  placeholder="/images/products/example.jpeg"
-                />
-              </Field>
-              <Field label="Describe it (for screen readers)" htmlFor={`alt-${index}`}>
-                <Input
-                  id={`alt-${index}`}
-                  name={`alt-${index}`}
-                  value={image.alt}
-                  onChange={(e) =>
-                    setImages((current) =>
-                      current.map((img, i) =>
-                        i === index ? { ...img, alt: e.target.value } : img,
-                      ),
-                    )
-                  }
-                  placeholder="Black Sea Mist candle burning beside raw tourmaline"
-                />
-              </Field>
-              <PortalButton
-                type="button"
-                tone="ghost"
-                size="sm"
-                className="mb-1"
-                onClick={() =>
-                  setImages((current) =>
-                    current.length === 1
-                      ? [{ url: '', alt: '' }]
-                      : current.filter((_, i) => i !== index),
-                  )
-                }
-              >
-                Remove
-              </PortalButton>
-            </div>
-          ))}
-        </div>
-
-        {images.length < 8 ? (
-          <PortalButton
-            type="button"
-            tone="secondary"
-            size="sm"
-            className="mt-5"
-            onClick={() => setImages((current) => [...current, { url: '', alt: '' }])}
-          >
-            Add another image
-          </PortalButton>
-        ) : null}
+        {collections.length === 0 ? (
+          <p className="text-[13.5px] text-ink-soft">
+            No collections yet.{' '}
+            <Link
+              href="/store-portal/collections/new"
+              className="underline decoration-ink-soft/50 underline-offset-2 hover:text-ink"
+            >
+              Create one
+            </Link>{' '}
+            to group candles for a season or a promotion.
+          </p>
+        ) : (
+          <ul className="grid gap-2.5 sm:grid-cols-2">
+            {collections.map((collection) => {
+              const checked = collectionIds.includes(collection.id)
+              return (
+                <li key={collection.id}>
+                  <label
+                    className={[
+                      'flex cursor-pointer items-center gap-3 border px-3.5 py-3 transition-colors',
+                      checked
+                        ? 'border-gild-deep/50 bg-gild/8'
+                        : 'border-rule bg-surface hover:border-ink/25',
+                    ].join(' ')}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={(e) =>
+                        setCollectionIds((current) =>
+                          e.target.checked
+                            ? [...current, collection.id]
+                            : current.filter((id) => id !== collection.id),
+                        )
+                      }
+                      className="h-4 w-4 accent-[#9a7838]"
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[14px] text-ink">
+                        {collection.name}
+                      </span>
+                      {collection.saleActive && collection.salePercent > 0 ? (
+                        <span className="mt-0.5 block text-[11.5px] text-gild-deep">
+                          {collection.salePercent}% off while this promotion runs
+                        </span>
+                      ) : null}
+                    </span>
+                  </label>
+                </li>
+              )
+            })}
+          </ul>
+        )}
       </Card>
 
       <Card title="Placement">

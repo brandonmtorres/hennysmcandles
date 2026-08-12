@@ -1,5 +1,5 @@
 import { db } from '@/lib/db'
-import { effectivePriceCents, isDiscounted } from '@/lib/money'
+import { effectivePriceCents, isDiscounted, resolveDiscountPercent } from '@/lib/money'
 import type { Prisma } from '@prisma/client'
 
 export type Visibility = 'VISIBLE' | 'HIDDEN' | 'AUTO'
@@ -15,8 +15,14 @@ export const STOREFRONT_VISIBILITY: Prisma.ProductWhereInput = {
   OR: [{ visibility: 'VISIBLE' }, { visibility: 'AUTO', stock: { gt: 0 } }],
 }
 
+/**
+ * Collections come along with every storefront product query so a promotion
+ * is priced in wherever a candle is shown. Loading them separately would
+ * eventually leave one surface quoting a price another does not honour.
+ */
 const withImages = {
   images: { orderBy: { sortOrder: 'asc' } },
+  collections: { include: { collection: true } },
 } satisfies Prisma.ProductInclude
 
 export type ProductWithImages = Prisma.ProductGetPayload<{ include: typeof withImages }>
@@ -41,7 +47,8 @@ export type ProductCard = {
   images: { url: string; alt: string }[]
 }
 
-export function toCard(p: ProductWithImages): ProductCard {
+export function toCard(p: ProductWithImages, now = new Date()): ProductCard {
+  const promos = p.collections.map((link) => link.collection)
   return {
     id: p.id,
     slug: p.slug,
@@ -50,9 +57,9 @@ export function toCard(p: ProductWithImages): ProductCard {
     scent: p.scent,
     description: p.description,
     priceCents: p.priceCents,
-    effectivePriceCents: effectivePriceCents(p),
-    discounted: isDiscounted(p),
-    salePercent: p.salePercent,
+    effectivePriceCents: effectivePriceCents(p, promos, now),
+    discounted: isDiscounted(p, promos, now),
+    salePercent: resolveDiscountPercent(p, promos, now),
     stock: p.stock,
     inStock: p.stock > 0,
     crystal: p.crystal,
@@ -68,7 +75,7 @@ export async function getStorefrontProducts(): Promise<ProductCard[]> {
     include: withImages,
     orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
   })
-  return rows.map(toCard)
+  return rows.map((row) => toCard(row))
 }
 
 export async function getFeaturedProducts(limit = 4): Promise<ProductCard[]> {
@@ -78,7 +85,7 @@ export async function getFeaturedProducts(limit = 4): Promise<ProductCard[]> {
     orderBy: [{ sortOrder: 'asc' }],
     take: limit,
   })
-  return rows.map(toCard)
+  return rows.map((row) => toCard(row))
 }
 
 export async function getProductBySlug(slug: string) {
@@ -96,7 +103,7 @@ export async function getRelatedProducts(slug: string, limit = 3): Promise<Produ
     orderBy: [{ featured: 'desc' }, { sortOrder: 'asc' }],
     take: limit,
   })
-  return rows.map(toCard)
+  return rows.map((row) => toCard(row))
 }
 
 export async function getAllProductSlugs(): Promise<string[]> {

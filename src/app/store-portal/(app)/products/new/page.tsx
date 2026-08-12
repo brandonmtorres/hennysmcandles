@@ -1,10 +1,16 @@
 import Link from 'next/link'
+import { db } from '@/lib/db'
 import { ProductForm } from '@/components/portal/ProductForm'
 
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Add a candle' }
 
-export default function NewProductPage() {
+export default async function NewProductPage() {
+  const collections = await db.collection.findMany({
+    orderBy: [{ sortOrder: 'asc' }, { name: 'asc' }],
+    select: { id: true, name: true, saleActive: true, salePercent: true },
+  })
+
   return (
     <>
       <nav className="mb-6 text-[12.5px] text-ink-soft" aria-label="Breadcrumb">
@@ -48,7 +54,9 @@ export default function NewProductPage() {
           featured: false,
           sortOrder: 0,
           images: [],
+          collectionIds: [],
         }}
+        collections={collections}
       />
     </>
   )

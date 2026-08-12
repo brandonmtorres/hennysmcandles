@@ -53,20 +53,51 @@ function readForm(formData: FormData) {
   }
 }
 
-/** Comma- or newline-separated image paths, paired with their alt text. */
+/**
+ * Images arrive as JSON so order and alt text stay together.
+ *
+ * Only same-origin paths under the two directories images are ever served
+ * from are accepted — an absolute URL here would let an admin session be used
+ * to hotlink or inject, and `..` would let it point anywhere on disk.
+ */
 function readImages(formData: FormData): { url: string; alt: string }[] {
-  const raw = String(formData.get('images') ?? '')
-  return raw
-    .split(/[\n,]/)
-    .map((line) => line.trim())
-    .filter(Boolean)
-    // Only same-origin paths — an external URL here would be an injection vector.
-    .filter((url) => url.startsWith('/'))
+  const raw = String(formData.get('images') ?? '[]')
+
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    return []
+  }
+  if (!Array.isArray(parsed)) return []
+
+  return parsed
+    .filter(
+      (item): item is { url: string; alt?: string } =>
+        typeof item === 'object' &&
+        item !== null &&
+        typeof (item as { url?: unknown }).url === 'string',
+    )
+    .map((item) => ({ url: item.url.trim(), alt: String(item.alt ?? '').trim() }))
+    .filter(
+      (item) =>
+        (item.url.startsWith('/uploads/') || item.url.startsWith('/images/')) &&
+        !item.url.includes('..'),
+    )
     .slice(0, 8)
-    .map((url, index) => ({
-      url,
-      alt: String(formData.get(`alt-${index}`) ?? '').trim() || 'Hennys M. candle',
+    .map((item) => ({
+      url: item.url,
+      alt: item.alt.slice(0, 200) || 'Hennys M. candle',
     }))
+}
+
+/** Collection ids the product should belong to, validated against the table. */
+function readCollectionIds(formData: FormData): string[] {
+  return String(formData.get('collectionIds') ?? '')
+    .split(',')
+    .map((id) => id.trim())
+    .filter(Boolean)
+    .slice(0, 40)
 }
 
 export async function saveProduct(
@@ -83,6 +114,7 @@ export async function saveProduct(
 
   const data = parsed.data
   const images = readImages(formData)
+  const collectionIds = readCollectionIds(formData)
 
   // Slugs are part of a public URL, so collisions must be caught explicitly.
   const clash = await db.product.findFirst({
@@ -116,19 +148,41 @@ export async function saveProduct(
     })
   }
 
-  if (savedId && images.length > 0) {
+  if (savedId) {
+    // Replaced wholesale rather than diffed: the form owns the full list and
+    // its order, so a removal has to be reflected as well as an addition.
     await db.productImage.deleteMany({ where: { productId: savedId } })
-    await db.productImage.createMany({
-      data: images.map((image, index) => ({
-        productId: savedId,
-        url: image.url,
-        alt: image.alt,
-        sortOrder: index,
-      })),
+    if (images.length > 0) {
+      await db.productImage.createMany({
+        data: images.map((image, index) => ({
+          productId: savedId,
+          url: image.url,
+          alt: image.alt,
+          sortOrder: index,
+        })),
+      })
+    }
+
+    // Only ids that actually exist are stored — the list arrives from a form
+    // and could name anything.
+    const valid = await db.collection.findMany({
+      where: { id: { in: collectionIds } },
+      select: { id: true },
     })
+    await db.productCollection.deleteMany({ where: { productId: savedId } })
+    if (valid.length > 0) {
+      await db.productCollection.createMany({
+        data: valid.map((collection, index) => ({
+          productId: savedId,
+          collectionId: collection.id,
+          sortOrder: index,
+        })),
+      })
+    }
   }
 
   revalidatePath('/store-portal/products')
+  revalidatePath('/collections', 'layout')
   revalidatePath('/products')
   revalidatePath('/')
   if (savedId) revalidatePath(`/products/${data.slug}`)

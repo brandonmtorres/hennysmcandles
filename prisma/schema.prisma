@@ -53,13 +53,58 @@ model Product {
   featured  Boolean @default(false)
   sortOrder Int     @default(0)
 
-  images ProductImage[]
-  items  OrderItem[]
+  images      ProductImage[]
+  items       OrderItem[]
+  collections ProductCollection[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([visibility, sortOrder])
+}
+
+/// A named group of candles — a seasonal edit, a gift set, a promotion.
+model Collection {
+  id          String @id @default(cuid())
+  slug        String @unique
+  name        String
+  tagline     String @default("")
+  description String @default("")
+
+  // "VISIBLE" | "HIDDEN" | "SCHEDULED" (visible only between the dates below)
+  visibility String @default("VISIBLE")
+  startsAt   DateTime?
+  endsAt     DateTime?
+
+  /// A discount applied to every candle in the collection while active.
+  /// Resolved server-side against each product's own sale; the larger wins.
+  salePercent Int     @default(0)
+  saleActive  Boolean @default(false)
+
+  /// Shown as a band on the home page.
+  featured  Boolean @default(false)
+  sortOrder Int     @default(0)
+
+  imageUrl String?
+
+  products ProductCollection[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([visibility, sortOrder])
+}
+
+model ProductCollection {
+  productId    String
+  collectionId String
+  sortOrder    Int    @default(0)
+
+  product    Product    @relation(fields: [productId], references: [id], onDelete: Cascade)
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+
+  @@id([productId, collectionId])
+  @@index([collectionId, sortOrder])
 }
 
 model ProductImage {
