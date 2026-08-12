@@ -288,7 +288,11 @@ export function CollectionForm({
                   value={bannerHeading}
                   onChange={(e) => setBannerHeading(e.target.value)}
                   maxLength={120}
-                  placeholder={getTheme(theme)?.heading}
+                  placeholder={
+                    getTheme(theme)
+                      ? `${getTheme(theme)!.headingLead} ${getTheme(theme)!.headingAccent}`
+                      : undefined
+                  }
                 />
               </Field>
               <Field label="Supporting line" htmlFor="bannerBody">
