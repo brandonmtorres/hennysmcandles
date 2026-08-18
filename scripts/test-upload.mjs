@@ -89,10 +89,14 @@ const post = (multipart) => ctx.request.post(`${BASE}/api/portal/upload`, { mult
   const url = body.files?.[0]?.url ?? ''
 
   check('accepts a genuine PNG', res.ok() && isStoredImageUrl(url), url)
+  // Only the generated name is examined. The bucket itself is called
+  // "hennysmcandles-images", so searching the whole URL for the uploaded
+  // filename finds the bucket and reports a leak that is not there.
+  const storedName = url.split('/uploads/')[1] ?? ''
   check(
     'discards the client filename',
-    !url.includes('candle') && !url.includes(' '),
-    url,
+    storedName.length > 0 && !storedName.includes('candle') && !storedName.includes(' '),
+    storedName,
   )
 
   // Where "stored" means depends on the backend. With a bucket configured the
