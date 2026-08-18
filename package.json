@@ -15,7 +15,8 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "check:email": "node scripts/check-email.mjs",
-    "test:security": "node scripts/test-security.mjs"
+    "test:security": "node scripts/test-security.mjs",
+    "check:storage": "node scripts/test-storage.mjs"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
