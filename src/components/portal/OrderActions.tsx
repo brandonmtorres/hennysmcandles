@@ -9,8 +9,17 @@ import {
   type OrderActionState,
 } from '@/app/store-portal/(app)/orders/actions'
 import { Card, Field, Input, PortalButton, Select, Textarea } from '@/components/portal/ui'
+import { formatMoney } from '@/lib/money'
+import { CARRIER_NAMES } from '@/lib/carriers'
 
-const CARRIERS = ['USPS', 'UPS', 'FedEx', 'DHL', 'Royal Mail', 'Canada Post', 'Other']
+/**
+ * The carriers we can build a tracking link for, plus an escape hatch.
+ *
+ * Taken from the shared list rather than typed out again, so a carrier added
+ * there gains a working link here without anyone remembering to. "Other" earns
+ * its place — the number is still worth recording even when we cannot link it.
+ */
+const CARRIERS = [...CARRIER_NAMES, 'Other']
 
 export function OrderActions({
   order,
@@ -21,7 +30,10 @@ export function OrderActions({
     trackingNumber: string
     carrier: string
     internalNotes: string
-    hasPaymentIntent: boolean
+    hasPayment: boolean
+    totalCents: number
+    refundedCents: number
+    currency: string
   }
 }) {
   const [fulfilState, fulfilAction] = useActionState<OrderActionState, FormData>(
@@ -40,17 +52,18 @@ export function OrderActions({
 
   const shipped = order.status === 'FULFILLED'
   const refunded = order.status === 'REFUNDED'
+  const remainingCents = order.totalCents - order.refundedCents
 
   return (
     <>
       <Card
-        title={shipped ? 'Shipping' : 'Pack and ship'}
+        title={shipped ? 'Shipping' : 'Send it'}
         description={
           refunded
             ? 'This order was refunded.'
             : shipped
-              ? 'Already marked as shipped. Updating the tracking number emails the customer again.'
-              : 'Add a tracking number if you have one, then mark it shipped. The customer is emailed automatically.'
+              ? 'Already marked as shipped. Updating the tracking number emails the customer again with the new one.'
+              : 'Enter the tracking number from your postage label, then mark it shipped. That is what emails the customer — nothing goes out before you press it.'
         }
       >
         <form action={fulfilAction} className="flex flex-col gap-5">
@@ -111,10 +124,14 @@ export function OrderActions({
         </form>
       </Card>
 
-      {order.hasPaymentIntent && !refunded ? (
+      {order.hasPayment && !refunded ? (
         <Card
           title="Refund"
-          description="Refunds the full amount through Stripe and puts the stock back on the shelf."
+          description={
+            order.refundedCents > 0
+              ? `${formatMoney(order.refundedCents, order.currency)} has already been refunded on this order. ${formatMoney(remainingCents, order.currency)} is still refundable.`
+              : 'Refunds through Square. A full refund puts the stock back on the shelf; a partial one leaves it alone, since usually nothing is coming back.'
+          }
         >
           {refundState.error ? <Alert tone="bad">{refundState.error}</Alert> : null}
           {refundState.message ? <Alert tone="good">{refundState.message}</Alert> : null}
@@ -128,19 +145,35 @@ export function OrderActions({
               Refund this order
             </PortalButton>
           ) : (
-            <form action={refundAction} className="flex flex-wrap items-center gap-3">
+            <form action={refundAction} className="flex flex-col gap-4">
               <input type="hidden" name="orderId" value={order.id} />
-              <p className="w-full text-[13.5px] text-ink">
-                This refunds the full amount and cannot be undone. Continue?
-              </p>
-              <RefundButton />
-              <PortalButton
-                type="button"
-                tone="ghost"
-                onClick={() => setConfirmingRefund(false)}
+
+              <Field
+                label="Amount"
+                htmlFor="refundAmount"
+                hint={`Leave blank to refund the whole ${formatMoney(remainingCents, order.currency)}.`}
               >
-                Cancel
-              </PortalButton>
+                <Input
+                  id="refundAmount"
+                  name="amount"
+                  inputMode="decimal"
+                  maxLength={12}
+                  placeholder={(remainingCents / 100).toFixed(2)}
+                />
+              </Field>
+
+              <p className="text-[13.5px] text-ink">This cannot be undone. Continue?</p>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <RefundButton />
+                <PortalButton
+                  type="button"
+                  tone="ghost"
+                  onClick={() => setConfirmingRefund(false)}
+                >
+                  Cancel
+                </PortalButton>
+              </div>
             </form>
           )}
         </Card>

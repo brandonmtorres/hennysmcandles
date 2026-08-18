@@ -16,7 +16,7 @@ export default async function DashboardPage() {
   const settings = await getSettings()
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
 
-  const [paidOrders, awaiting, recent, lowStock, productCount, subscribers] =
+  const [paidOrders, awaiting, toPack, recent, lowStock, productCount, subscribers] =
     await Promise.all([
       db.order.findMany({
         where: {
@@ -26,6 +26,14 @@ export default async function DashboardPage() {
         select: { totalCents: true },
       }),
       db.order.count({ where: { status: 'PAID' } }),
+      // Oldest first: the queue is worked from the front, and the one that has
+      // been waiting longest is the one a customer is starting to wonder about.
+      db.order.findMany({
+        where: { status: 'PAID' },
+        orderBy: { createdAt: 'asc' },
+        take: 5,
+        include: { items: { select: { quantity: true, name: true } } },
+      }),
       db.order.findMany({
         orderBy: { createdAt: 'desc' },
         take: 6,
@@ -79,6 +87,69 @@ export default async function DashboardPage() {
           detail={`${subscribers} on the mailing list`}
         />
       </div>
+
+      {/* The working queue. It sits above everything else because it is the
+          one thing on this page with a deadline attached, and it disappears
+          entirely when there is nothing to do — an empty panel every morning
+          teaches you to stop looking at the page. */}
+      {toPack.length > 0 ? (
+        <div className="mt-8">
+          <Card
+            title={`To pack · ${awaiting}`}
+            description="Oldest first. Open one to print its slip and send it."
+            actions={
+              <Link
+                href="/store-portal/orders?filter=to-pack"
+                className="text-[12px] text-ink-soft transition-colors hover:text-ink"
+              >
+                See all
+              </Link>
+            }
+          >
+            <ul className="flex flex-col">
+              {toPack.map((order) => {
+                const days = Math.floor(
+                  (Date.now() - order.createdAt.getTime()) / (24 * 60 * 60 * 1000),
+                )
+                const candles = order.items.reduce((n, i) => n + i.quantity, 0)
+                return (
+                  <li
+                    key={order.id}
+                    className="flex flex-wrap items-center justify-between gap-4 border-b border-rule py-3.5 last:border-b-0"
+                  >
+                    <div className="min-w-0">
+                      <Link
+                        href={`/store-portal/orders/${order.id}`}
+                        className="text-[14.5px] text-ink underline decoration-rule underline-offset-4 transition-colors hover:decoration-ink"
+                      >
+                        {order.orderNumber}
+                      </Link>
+                      <span className="ml-3 text-[13px] text-ink-soft">
+                        {order.name ?? order.email}
+                      </span>
+                      <p className="mt-1 text-[12.5px] text-ink-soft">
+                        {candles} candle{candles === 1 ? '' : 's'} ·{' '}
+                        {days === 0
+                          ? 'came in today'
+                          : `waiting ${days} day${days === 1 ? '' : 's'}`}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {days >= 2 ? <Badge tone="bad">Overdue</Badge> : null}
+                      <Link
+                        href={`/store-portal/orders/${order.id}/packing-slip`}
+                        className="text-[11px] uppercase tracking-[0.16em] text-gild-deep transition-opacity hover:opacity-70"
+                      >
+                        Packing slip →
+                      </Link>
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
+          </Card>
+        </div>
+      ) : null}
 
       <div className="mt-8 grid gap-6 lg:grid-cols-[1.3fr_1fr]">
         <Card

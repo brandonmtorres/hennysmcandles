@@ -58,7 +58,19 @@ async function deliver(email: Email): Promise<SendResult> {
   const apiKey = process.env.RESEND_API_KEY
   const from = process.env.EMAIL_FROM ?? 'Hennys M. Candles <onboarding@resend.dev>'
 
-  if (!apiKey) return writePreview(email)
+  if (!apiKey) {
+    // In production there is no such thing as a helpful preview file: the
+    // filesystem is usually read-only, nobody is watching the directory, and
+    // the customer who just paid is getting silence. Say so plainly in the
+    // logs rather than failing quietly into a folder that may not exist.
+    if (process.env.NODE_ENV === 'production') {
+      console.error(
+        `[email] NOT SENT — RESEND_API_KEY is not set. "${email.subject}" for ${email.to} was dropped.`,
+      )
+      return { ok: false, error: 'No email provider is configured.' }
+    }
+    return writePreview(email)
+  }
 
   try {
     // Imported lazily so the package is never loaded when it is not configured.
@@ -82,6 +94,17 @@ async function deliver(email: Email): Promise<SendResult> {
  * Sends an email. Never throws — a failed confirmation email must not roll
  * back a paid order, so callers get a result they can log and move on.
  */
+/**
+ * Whether mail actually leaves the building.
+ *
+ * The portal asks this so it can say plainly that nothing is being delivered,
+ * rather than letting an owner write and test emails for an hour without
+ * realising no customer has ever received one.
+ */
+export function isEmailSending(): boolean {
+  return Boolean(process.env.RESEND_API_KEY)
+}
+
 export async function sendEmail(email: Email): Promise<SendResult> {
   const result = await deliver(email)
   if (!result.ok) console.error('[email] delivery failed:', result.error)

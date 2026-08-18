@@ -2,6 +2,7 @@ import Image from 'next/image'
 import { Atmosphere } from '@/components/visual/Atmosphere'
 import { ButtonLink } from '@/components/ui/Button'
 import { pluralise, spell } from '@/lib/words'
+import { ScriptText } from '@/components/brand/ScriptText'
 
 /**
  * First viewport.
@@ -66,15 +67,15 @@ export function Hero({ scentCount }: { scentCount: number }) {
       <Atmosphere
         sourceX={0.78}
         sourceY={0.52}
-        emberCount={26}
-        drift={-0.3}
+        emberCount={104}
+        drift={-0.82}
         className="hidden lg:block"
       />
       <Atmosphere
         sourceX={0.5}
         sourceY={0.2}
-        emberCount={16}
-        drift={-0.12}
+        emberCount={52}
+        drift={-0.3}
         className="lg:hidden"
       />
 
@@ -90,12 +91,12 @@ export function Hero({ scentCount }: { scentCount: number }) {
 
           <h1 className="display-xl rise mt-5 text-wax sm:mt-6">
             <span style={{ '--rise-delay': '120ms' } as React.CSSProperties}>Bring light</span>
-            <span
-              className="script text-gild"
+            <ScriptText
+              className="text-gild"
               style={{ '--rise-delay': '260ms' } as React.CSSProperties}
             >
               to your life
-            </span>
+            </ScriptText>
           </h1>
 
           <p

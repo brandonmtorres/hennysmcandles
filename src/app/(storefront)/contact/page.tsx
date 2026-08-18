@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { ContactForm } from '@/components/layout/ContactForm'
+import { ScriptText } from '@/components/brand/ScriptText'
 
 export const metadata: Metadata = {
   title: 'Contact',
@@ -37,7 +38,7 @@ export default function ContactPage() {
         <div className="mx-auto max-w-7xl">
           <p className="label text-gild/90">Contact</p>
           <h1 className="display-lg mt-5 max-w-[16ch] text-wax">
-            Say <span className="script text-gild">hello</span>
+            Say <ScriptText className="text-gild">hello</ScriptText>
           </h1>
           <p className="lede mt-6 max-w-[48ch]">
             Questions about a scent, an order, or a custom batch go straight to Hennys.

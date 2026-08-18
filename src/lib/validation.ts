@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isUsState } from '@/lib/us-states'
 
 /**
  * Every value that crosses a trust boundary is parsed here first.
@@ -30,6 +31,21 @@ export const checkoutRequestSchema = z.object({
   items: z.array(checkoutItemSchema).min(1, 'Your cart is empty.').max(30),
   /** Optional promo code; always re-validated server-side before use. */
   code: z.string().trim().max(40).optional(),
+  /**
+   * Where the order is going.
+   *
+   * Optional here, and required by the route only when the shop actually
+   * charges tax — because that is the single reason it must be known before
+   * payment. Square's hosted page fixes the amount before it collects an
+   * address, so a destination-dependent charge has to be settled one step
+   * earlier. A shop charging no tax has nothing to settle, and asks nothing.
+   */
+  state: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .refine((v) => v === '' || isUsState(v), 'Choose the state you are shipping to.')
+    .optional(),
 })
 
 export const loginSchema = z.object({
@@ -89,6 +105,12 @@ export const settingsSchema = z.object({
   shippingFlatCents: z.number().int().min(0).max(100_000),
   freeShippingThresholdCents: z.number().int().min(0).max(1_000_000),
   taxPercent: z.number().min(0).max(30),
+  /** Blank is meaningful: it charges tax to nobody. */
+  taxHomeState: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .refine((v) => v === '' || isUsState(v), 'Use a two-letter state code, or leave blank.'),
   lowStockThreshold: z.number().int().min(0).max(1000),
   announcement: z.string().trim().max(200),
 })

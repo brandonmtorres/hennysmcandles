@@ -247,12 +247,15 @@ export function ProductForm({
           <Field
             label="Show on shop"
             htmlFor="visibility"
-            hint="“While in stock” hides it at zero."
+            hint="A listed candle stays on the shop when it runs out, marked sold out, so people know it exists and can come back for it."
           >
-            <Select id="visibility" name="visibility" defaultValue={values.visibility}>
-              <option value="AUTO">While in stock</option>
-              <option value="VISIBLE">Always</option>
-              <option value="HIDDEN">Never — hidden</option>
+            <Select
+              id="visibility"
+              name="visibility"
+              defaultValue={values.visibility === 'AUTO' ? 'VISIBLE' : values.visibility}
+            >
+              <option value="VISIBLE">Listed</option>
+              <option value="HIDDEN">Hidden</option>
             </Select>
           </Field>
         </div>

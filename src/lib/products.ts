@@ -5,14 +5,40 @@ import type { Prisma } from '@prisma/client'
 export type Visibility = 'VISIBLE' | 'HIDDEN' | 'AUTO'
 
 /**
- * The storefront's definition of "purchasable".
+ * What the storefront lists.
  *
- *  VISIBLE — always listed, even at zero stock (shows as sold out)
- *  HIDDEN  — never listed
- *  AUTO    — listed only while stock remains
+ *  VISIBLE — listed. At zero stock it shows as sold out rather than vanishing.
+ *  HIDDEN  — never listed.
+ *  AUTO    — legacy. Behaves as VISIBLE.
+ *
+ * Selling out used to remove a candle from the shop entirely, which threw away
+ * the most useful thing an empty shelf can do: tell someone the scent exists,
+ * that other people wanted it, and that it is worth coming back for. A sold-out
+ * card also keeps its link alive — anything already shared or indexed still
+ * leads somewhere rather than to a 404.
+ *
+ * Emptiness is therefore a state a product is *shown in*, not a reason to hide
+ * it. Only a deliberate "Hidden" takes a candle off the shop.
  */
 export const STOREFRONT_VISIBILITY: Prisma.ProductWhereInput = {
-  OR: [{ visibility: 'VISIBLE' }, { visibility: 'AUTO', stock: { gt: 0 } }],
+  visibility: { not: 'HIDDEN' },
+}
+
+/**
+ * A few candles to link from the footer.
+ *
+ * These used to be three slugs typed into the footer by hand, which meant a
+ * hidden candle stayed linked from every page on the site, and a renamed one
+ * would have sent every visitor to a 404. Reading them from the catalogue
+ * costs one small query on a page that is already dynamic.
+ */
+export async function getFooterCandles(limit = 3) {
+  return db.product.findMany({
+    where: STOREFRONT_VISIBILITY,
+    orderBy: [{ featured: 'desc' }, { sortOrder: 'asc' }],
+    take: limit,
+    select: { slug: true, name: true },
+  })
 }
 
 /**

@@ -3,26 +3,44 @@ import type { NextConfig } from 'next'
 /**
  * Content Security Policy.
  *
- * Stripe needs script + frame access for Checkout and the payment element.
+ * Payment happens on Square's own hosted page rather than inside this one, so
+ * the policy stays tight: no third-party script, frame or connect origin is
+ * needed for checkout. `form-action` is the exception — the browser follows a
+ * redirect to Square when the customer leaves to pay.
  * `unsafe-inline` on styles is required by Next's inlined critical CSS.
  */
 const isDev = process.env.NODE_ENV === 'development'
 
+/**
+ * Where product images are served from, when they are not served from here.
+ *
+ * Both the image optimiser and the Content Security Policy have to be told
+ * about the bucket's public domain, and neither can be told at run time — so
+ * it is read from the environment at build. A deployment that keeps its images
+ * on local disk sets nothing and this stays empty.
+ */
+const imageHost = (() => {
+  const raw = process.env.S3_PUBLIC_URL
+  if (!raw) return null
+  try {
+    const { protocol, hostname } = new URL(raw)
+    return { protocol: protocol.replace(':', '') as 'http' | 'https', hostname }
+  } catch {
+    throw new Error(`S3_PUBLIC_URL is not a valid URL: ${raw}`)
+  }
+})()
+
 const csp = [
   "default-src 'self'",
   // React Fast Refresh evaluates strings in development only; production stays strict.
-  `script-src 'self' 'unsafe-inline' ${isDev ? "'unsafe-eval'" : ''} https://js.stripe.com`.replace(
-    /\s+/g,
-    ' ',
-  ),
+  `script-src 'self' 'unsafe-inline' ${isDev ? "'unsafe-eval'" : ''}`.replace(/\s+/g, ' '),
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://*.stripe.com",
+  `img-src 'self' data: blob: https://*.squarecdn.com${imageHost ? ` ${imageHost.protocol}://${imageHost.hostname}` : ''}`,
   "font-src 'self' data:",
-  "connect-src 'self' https://api.stripe.com",
-  "frame-src https://js.stripe.com https://hooks.stripe.com",
+  "connect-src 'self'",
   "object-src 'none'",
   "base-uri 'self'",
-  "form-action 'self'",
+  "form-action 'self' https://squareup.com https://*.squareup.com",
   "frame-ancestors 'none'",
   'upgrade-insecure-requests',
 ].join('; ')
@@ -35,8 +53,9 @@ const securityHeaders = [
   { key: 'X-DNS-Prefetch-Control', value: 'on' },
   {
     key: 'Permissions-Policy',
-    // payment=* is required so Apple Pay / Google Pay can run inside the Stripe frame.
-    value: 'camera=(), microphone=(), geolocation=(), payment=*',
+    // Payment happens on Square's own domain, so this page needs no payment
+    // permission of its own.
+    value: 'camera=(), microphone=(), geolocation=(), payment=()',
   },
   {
     key: 'Strict-Transport-Security',
@@ -49,6 +68,12 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   images: {
     formats: ['image/avif', 'image/webp'],
+    // Only the configured bucket, never a wildcard: the optimiser will fetch
+    // and re-serve anything listed here, so an open pattern turns it into a
+    // proxy for the whole internet.
+    remotePatterns: imageHost
+      ? [{ protocol: imageHost.protocol, hostname: imageHost.hostname, pathname: '/**' }]
+      : [],
     deviceSizes: [360, 480, 640, 828, 1080, 1280, 1600, 1920],
     // Every `quality` value used anywhere must be listed here — Next rejects
     // an unlisted one with a 400 and the image simply does not render.

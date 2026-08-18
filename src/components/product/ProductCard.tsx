@@ -35,12 +35,10 @@ export function ProductTile({
       }
     >
       <Link href={`/products/${product.slug}`} className="block focus-visible:outline-offset-8">
-        <div
-          className={[
-            'relative overflow-hidden bg-ash',
-            compact ? 'aspect-[3/4]' : 'aspect-[4/5]',
-          ].join(' ')}
-        >
+        {/* One crop everywhere. The showcase used to be taller than the shop's
+            own tiles, which made the same candle look like two different
+            products depending on where you met it. */}
+        <div className="relative aspect-[4/5] overflow-hidden bg-ash">
           {image ? (
             <Photo
               src={image.url}
@@ -50,7 +48,7 @@ export function ProductTile({
               quality={82}
               sizes={
                 compact
-                  ? '(max-width: 639px) 46vw, (max-width: 1023px) 30vw, 16vw'
+                  ? '(max-width: 639px) 46vw, (max-width: 1023px) 30vw, 12vw'
                   : '(max-width: 639px) 88vw, (max-width: 1023px) 45vw, 30vw'
               }
               className={[

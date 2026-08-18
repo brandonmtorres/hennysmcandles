@@ -1,6 +1,7 @@
 import Image from 'next/image'
 import { ButtonLink } from '@/components/ui/Button'
 import { LitSection } from '@/components/visual/LitSection'
+import { ScriptText } from '@/components/brand/ScriptText'
 
 /**
  * The maker. The copy here is Hennys' own, kept close to how she wrote it —
@@ -39,7 +40,7 @@ export function MeetHennys() {
             id="hennys-heading"
             style={{ '--reveal-delay': '80ms' } as React.CSSProperties}
           >
-            Hi, <span className="script text-gild">I&rsquo;m Hennys</span>
+            Hi, <ScriptText className="text-gild">I&rsquo;m Hennys</ScriptText>
           </h2>
 
           <blockquote

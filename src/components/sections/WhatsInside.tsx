@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import { LitSection } from '@/components/visual/LitSection'
+import { ScriptText } from '@/components/brand/ScriptText'
 
 /**
  * The differentiator section.
@@ -120,7 +121,7 @@ export function WhatsInside() {
             id="inside-heading"
             style={{ '--reveal-delay': '80ms' } as React.CSSProperties}
           >
-            Four things, <span className="script text-gild">nothing else</span>
+            Four things, <ScriptText className="text-gild">nothing else</ScriptText>
           </h2>
           <p
             className="lede reveal mt-6 max-w-[48ch]"

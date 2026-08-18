@@ -1,4 +1,8 @@
 import { formatMoney } from '@/lib/money'
+import { getSettings } from '@/lib/settings'
+import { trackingUrlFor } from '@/lib/carriers'
+import { addressLines } from '@/lib/address'
+import { fillTokens, getEmailCopy, type EmailCopy, type TokenValues } from '@/lib/email/copy'
 
 /**
  * Transactional email templates.
@@ -141,23 +145,7 @@ function summaryTable(data: OrderEmailData): string {
 }
 
 function addressBlock(raw?: string | null): string {
-  if (!raw) return ''
-  let parsed: Record<string, unknown>
-  try {
-    parsed = JSON.parse(raw)
-  } catch {
-    return ''
-  }
-  const lines = [
-    parsed.name,
-    parsed.line1,
-    parsed.line2,
-    [parsed.city, parsed.state, parsed.postal_code].filter(Boolean).join(', '),
-    parsed.country,
-  ]
-    .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
-    .map((v) => escapeHtml(v))
-
+  const lines = addressLines(raw).map((line) => escapeHtml(line))
   if (lines.length === 0) return ''
 
   return `<div style="margin-top:26px;padding-top:22px;border-top:1px solid ${RULE};">
@@ -168,25 +156,55 @@ function addressBlock(raw?: string | null): string {
 
 // ---------------------------------------------------------------------------
 
-export function orderConfirmationEmail(data: OrderEmailData) {
-  const name = data.customerName?.split(' ')[0] ?? 'there'
+/** Owner-written text to HTML: blank lines become paragraphs, nothing else. */
+function paragraphs(text: string, style: string): string {
+  return text
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean)
+    .map(
+      (block) =>
+        `<p style="${style}">${escapeHtml(block).replace(/\n/g, '<br>')}</p>`,
+    )
+    .join('')
+}
+
+function tokenValues(data: OrderEmailData, shop: string): TokenValues {
+  return {
+    first_name: data.customerName?.trim().split(/\s+/)[0] || 'there',
+    name: data.customerName?.trim() || 'there',
+    order_number: data.orderNumber,
+    total: formatMoney(data.totalCents, data.currency),
+    tracking: data.trackingNumber ?? '',
+    carrier: data.carrier ?? '',
+    shop,
+  }
+}
+
+/**
+ * Renders the confirmation from supplied copy.
+ *
+ * Copy is a parameter rather than something this function fetches, so the
+ * portal can preview wording that has not been saved yet against the very same
+ * renderer that sends the real thing.
+ */
+export function renderOrderConfirmation(
+  data: OrderEmailData,
+  copy: EmailCopy,
+  shop: string,
+) {
+  const values = tokenValues(data, shop)
   const body = `
-    ${heading(`Thank you, ${name}.`)}
+    ${heading(fillTokens(copy.heading, values))}
     <p style="margin:0 0 6px;color:${MUTED};">Order ${escapeHtml(data.orderNumber)}</p>
-    <p style="margin:16px 0 0;">
-      Your candles are confirmed. Each one is poured, set with its crystal and finished by hand,
-      so give us a day or two before it ships — we will email you the moment it is on its way.
-    </p>
+    ${paragraphs(fillTokens(copy.intro, values), `margin:16px 0 0;color:${INK};`)}
     ${summaryTable(data)}
     ${addressBlock(data.shippingAddress)}
-    <p style="margin:26px 0 0;color:${MUTED};font-size:13px;">
-      A note on your first burn: let the wax melt all the way to the edge, about two to three hours.
-      It sets the memory of the pool and stops the candle tunnelling later.
-    </p>
+    ${copy.outro.trim() ? paragraphs(fillTokens(copy.outro, values), `margin:26px 0 0;color:${MUTED};font-size:13px;`) : ''}
     ${button(`${siteUrl()}/products`, 'Explore the collection')}
   `
   return {
-    subject: `Order ${data.orderNumber} confirmed · Hennys M. Homemade Candles`,
+    subject: fillTokens(copy.subject, values),
     html: shell(
       'Order confirmed',
       `Thank you — order ${data.orderNumber} is confirmed.`,
@@ -195,26 +213,52 @@ export function orderConfirmationEmail(data: OrderEmailData) {
   }
 }
 
-export function shippingNoticeEmail(data: OrderEmailData) {
-  const name = data.customerName?.split(' ')[0] ?? 'there'
+export function renderShippingNotice(data: OrderEmailData, copy: EmailCopy, shop: string) {
+  const values = tokenValues(data, shop)
+  const url = trackingUrlFor(data.carrier, data.trackingNumber)
+
   const tracking = data.trackingNumber
     ? `<div style="margin-top:22px;padding:18px 20px;background:#faf7f0;border:1px solid ${RULE};">
          <div style="font-family:${SANS};font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:${MUTED};">Tracking${data.carrier ? ` · ${escapeHtml(data.carrier)}` : ''}</div>
          <div style="font-family:${SANS};font-size:16px;margin-top:7px;color:${INK};letter-spacing:.04em;">${escapeHtml(data.trackingNumber)}</div>
+         ${
+           url
+             ? `<div style="margin-top:12px;"><a href="${url}" style="font-family:${SANS};font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:${INK};">Follow it &rarr;</a></div>`
+             : ''
+         }
        </div>`
     : ''
+
   const body = `
-    ${heading(`It is on its way, ${name}.`)}
+    ${heading(fillTokens(copy.heading, values))}
     <p style="margin:0 0 6px;color:${MUTED};">Order ${escapeHtml(data.orderNumber)}</p>
-    <p style="margin:16px 0 0;">Your order has left the studio.</p>
+    ${paragraphs(fillTokens(copy.intro, values), `margin:16px 0 0;color:${INK};`)}
     ${tracking}
     ${summaryTable(data)}
     ${addressBlock(data.shippingAddress)}
+    ${copy.outro.trim() ? paragraphs(fillTokens(copy.outro, values), `margin:26px 0 0;color:${MUTED};font-size:13px;`) : ''}
   `
   return {
-    subject: `Your order ${data.orderNumber} has shipped`,
+    subject: fillTokens(copy.subject, values),
     html: shell('Your order has shipped', `Order ${data.orderNumber} is on its way.`, body),
   }
+}
+
+/** The confirmation as it will actually send, with the owner's saved wording. */
+export async function orderConfirmationEmail(data: OrderEmailData) {
+  const [copy, settings] = await Promise.all([
+    getEmailCopy('order_confirmation'),
+    getSettings(),
+  ])
+  return renderOrderConfirmation(data, copy, settings.storeName)
+}
+
+export async function shippingNoticeEmail(data: OrderEmailData) {
+  const [copy, settings] = await Promise.all([
+    getEmailCopy('shipping_notice'),
+    getSettings(),
+  ])
+  return renderShippingNotice(data, copy, settings.storeName)
 }
 
 export function ownerNewOrderEmail(data: OrderEmailData) {
@@ -252,4 +296,90 @@ export function lowStockEmail(items: { name: string; stock: number }[]) {
     subject: `Low stock: ${items.length} candle${items.length === 1 ? '' : 's'} need attention`,
     html: shell('Low stock', 'Some candles are running low.', body),
   }
+}
+
+
+// ---------------------------------------------------------------------------
+// Newsletter
+// ---------------------------------------------------------------------------
+
+/**
+ * Every marketing email carries a working unsubscribe link. This is not
+ * optional politeness — CAN-SPAM and GDPR both require it, and providers
+ * score senders on how easy it is to leave.
+ */
+function unsubscribeFooter(token: string): string {
+  const url = `${siteUrl()}/unsubscribe/${token}`
+  return `<div style="margin-top:34px;padding-top:22px;border-top:1px solid ${RULE};font-family:${SANS};font-size:11.5px;line-height:1.7;color:${MUTED};">
+    You are receiving this because you asked for notes from the studio.
+    <a href="${url}" style="color:${MUTED};text-decoration:underline;">Unsubscribe</a> at any time — one click, no questions.
+  </div>`
+}
+
+export function welcomeEmail(data: {
+  token: string
+  discountPercent: number
+  discountCode?: string
+}) {
+  const codeBlock = data.discountCode
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" style="margin:26px 0;"><tr>
+        <td style="border:1px dashed ${GILD};padding:18px 26px;text-align:center;">
+          <div style="font-family:${SANS};font-size:10px;letter-spacing:.24em;text-transform:uppercase;color:${MUTED};">Your code</div>
+          <div style="font-family:${SANS};font-size:22px;letter-spacing:.18em;color:${INK};margin-top:8px;">${escapeHtml(data.discountCode)}</div>
+          <div style="font-family:${SANS};font-size:12px;color:${MUTED};margin-top:8px;">${data.discountPercent}% off your first order</div>
+        </td></tr></table>`
+    : ''
+
+  const body = `
+    ${heading('Welcome to the quiet list.')}
+    <p style="margin:0;">
+      Thank you for being here. You will hear from me when there is something
+      worth saying — a new pour, a seasonal batch, the occasional note from the
+      studio. Never more than that.
+    </p>
+    ${codeBlock}
+    <p style="margin:22px 0 0;color:${MUTED};font-size:13px;">
+      Everything is hand-poured in small batches, set with raw crystals, and
+      labelled by hand. If a scent sells out it stays out until the next pour —
+      the list is usually the first to know when it is back.
+    </p>
+    ${button(`${siteUrl()}/products`, 'Explore the collection')}
+    ${unsubscribeFooter(data.token)}
+  `
+  return {
+    subject: 'Welcome to Hennys M. Homemade Candles',
+    html: shell('Welcome', 'Thank you for joining the quiet list.', body),
+  }
+}
+
+export function campaignEmail(data: {
+  subject: string
+  preheader: string
+  body: string
+  ctaLabel: string
+  ctaUrl: string
+  token: string
+}) {
+  const paragraphs = data.body
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .map(
+      (p) =>
+        `<p style="margin:0 0 18px;font-family:${SANS};font-size:15px;line-height:1.7;color:${INK};">${escapeHtml(
+          p,
+        ).replace(/\n/g, '<br>')}</p>`,
+    )
+    .join('')
+
+  const cta =
+    data.ctaLabel && data.ctaUrl ? button(data.ctaUrl, data.ctaLabel) : ''
+
+  const html = shell(
+    data.subject,
+    data.preheader || data.subject,
+    `${heading(data.subject)}${paragraphs}${cta}${unsubscribeFooter(data.token)}`,
+  )
+
+  return { subject: data.subject, html }
 }

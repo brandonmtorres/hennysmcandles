@@ -14,6 +14,7 @@ export function SettingsForm({
     shippingFlat: string
     freeShippingThreshold: string
     taxPercent: number
+    taxHomeState: string
     lowStockThreshold: number
     announcement: string
   }
@@ -90,11 +91,34 @@ export function SettingsForm({
               inputMode="decimal"
             />
           </Field>
+        </div>
+      </Card>
+
+      <Card
+        title="Sales tax"
+        description="Tax is charged only to customers in your own state, on the candles themselves — not on shipping. Leave the state blank and nobody is charged tax at all."
+      >
+        <div className="grid gap-6 sm:grid-cols-2">
+          <Field
+            label="Your state"
+            htmlFor="taxHomeState"
+            error={error('taxHomeState')}
+            hint="Two letters, e.g. OR. Blank charges no tax to anyone."
+          >
+            <Input
+              id="taxHomeState"
+              name="taxHomeState"
+              maxLength={2}
+              placeholder="—"
+              defaultValue={values.taxHomeState}
+              className="uppercase"
+            />
+          </Field>
           <Field
             label="Tax rate (%)"
             htmlFor="taxPercent"
             error={error('taxPercent')}
-            hint="Leave at 0 to let Stripe handle tax."
+            hint="Your state's combined rate. Check it with your own state's revenue department."
           >
             <Input
               id="taxPercent"

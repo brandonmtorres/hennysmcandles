@@ -1,12 +1,17 @@
 'use client'
 
-import { useActionState } from 'react'
+import { useActionState, useState } from 'react'
 import { useFormStatus } from 'react-dom'
 import { signIn, verifyTotpCode, type LoginState } from '@/app/store-portal/login/actions'
 
 export function LoginForm() {
   const [state, action] = useActionState<LoginState, FormData>(signIn, {})
   const [mfaState, mfaAction] = useActionState<LoginState, FormData>(verifyTotpCode, {})
+
+  // Off by default, and never remembered between visits: a password revealed
+  // because of a choice made last week is a password shown to whoever is
+  // standing there today.
+  const [showPassword, setShowPassword] = useState(false)
 
   // Once the password step succeeds the form swaps to the code step. If the
   // code step reports the challenge expired, it swaps back.
@@ -62,19 +67,72 @@ export function LoginForm() {
         <label htmlFor="password" className="label-sm mb-3 block text-smoke">
           Password
         </label>
-        <input
-          id="password"
-          name="password"
-          type="password"
-          autoComplete="current-password"
-          required
-          className="h-12 w-full border border-wax/20 bg-transparent px-4 text-[15px] text-wax transition-colors focus:border-gild focus:outline-none"
-        />
+        <div className="relative">
+          <input
+            id="password"
+            name="password"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="current-password"
+            required
+            // Room on the right for the toggle, so a long password never runs
+            // underneath it.
+            className="h-12 w-full border border-wax/20 bg-transparent pl-4 pr-14 text-[15px] text-wax transition-colors focus:border-gild focus:outline-none"
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((shown) => !shown)}
+            // The button sits inside the field, so it must not be a submit and
+            // must not take the label's name. Screen readers get the state
+            // through aria-pressed rather than a changing label alone.
+            aria-pressed={showPassword}
+            aria-label={showPassword ? 'Hide password' : 'Show password'}
+            className="absolute inset-y-0 right-0 flex w-14 items-center justify-center text-smoke transition-colors hover:text-wax focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-gild"
+          >
+            {showPassword ? <EyeOffIcon /> : <EyeIcon />}
+          </button>
+        </div>
+        <p className="mt-3 text-[12px] text-smoke">
+          {showPassword
+            ? 'Your password is visible — mind who is behind you.'
+            : 'Reveal it if you need to check what you typed.'}
+        </p>
       </div>
 
       {state.error ? <ErrorNote>{state.error}</ErrorNote> : null}
       <Submit idle="Sign in" busy="Signing in…" />
     </form>
+  )
+}
+
+/* Hairline strokes to match the close control on the cart drawer, so the
+   portal and the storefront look drawn by the same hand. */
+function EyeIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path
+        d="M1 9s3-5 8-5 8 5 8 5-3 5-8 5-8-5-8-5Z"
+        stroke="currentColor"
+        strokeWidth="1.1"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <circle cx="9" cy="9" r="2.15" stroke="currentColor" strokeWidth="1.1" />
+    </svg>
+  )
+}
+
+function EyeOffIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+      <path
+        d="M1 9s3-5 8-5c1.2 0 2.3.3 3.2.7M17 9s-3 5-8 5c-1.2 0-2.3-.3-3.2-.7"
+        stroke="currentColor"
+        strokeWidth="1.1"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M2.5 2.5l13 13" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+    </svg>
   )
 }
 

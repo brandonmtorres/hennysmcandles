@@ -3,7 +3,7 @@ import { db } from '@/lib/db'
 /**
  * Promo code validation and discount maths.
  *
- * The same function decides both what the cart previews and what Stripe is
+ * The same function decides both what the cart previews and what Square is
  * told to charge, so the two can never disagree. Codes are stored upper-case
  * and looked up upper-case, which makes entry case-insensitive without
  * allowing two codes that differ only in case.

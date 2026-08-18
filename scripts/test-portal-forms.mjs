@@ -2,7 +2,10 @@
  * Portal form behaviour: slug autofill and the collection picker.
  */
 import { chromium } from 'playwright-core'
+import { PrismaClient } from '@prisma/client'
 import fs from 'node:fs'
+
+const db = new PrismaClient()
 
 const EXECUTABLE = fs
   .readdirSync('/root/.cache/ms-playwright')
@@ -97,14 +100,34 @@ const hasPicker = (await page.locator('text=Midwinter Edit').count()) > 0
 check('the collection picker lists existing collections', hasPicker)
 
 await page.goto(`${BASE}/store-portal/collections`, { waitUntil: 'networkidle' })
+
+// Whichever collections exist, the list must name them.
+const anyCollection = await db.collection.findFirst({ select: { id: true, name: true, salePercent: true, saleActive: true } })
 check(
-  'the collections list shows the seeded edit',
-  (await page.locator('text=The Midwinter Edit').count()) > 0,
+  'the collections list names an existing collection',
+  anyCollection ? (await page.locator(`text=${anyCollection.name}`).count()) > 0 : false,
+  anyCollection?.name ?? 'no collections',
 )
-check(
-  'a running promotion is visible in the list',
-  (await page.locator('text=15% off').count()) > 0,
-)
+
+// A running promotion has to be visible at a glance. The state is set up here
+// rather than assumed, because the seeded promotion is long gone — these are
+// the shop's real collections now and the owner edits them.
+if (anyCollection) {
+  const before = { salePercent: anyCollection.salePercent, saleActive: anyCollection.saleActive }
+  await db.collection.update({
+    where: { id: anyCollection.id },
+    data: { salePercent: 15, saleActive: true },
+  })
+  try {
+    await page.goto(`${BASE}/store-portal/collections`, { waitUntil: 'networkidle' })
+    check(
+      'a running promotion is visible in the list',
+      (await page.locator('text=15% off').count()) > 0,
+    )
+  } finally {
+    await db.collection.update({ where: { id: anyCollection.id }, data: before })
+  }
+}
 
 // --- Uploader --------------------------------------------------------------
 console.log('\nImage uploader\n')
@@ -130,3 +153,5 @@ console.log(
     : `\n\x1b[31m${failures} check(s) failed.\x1b[0m\n`,
 )
 if (failures > 0) process.exitCode = 1
+
+await db.$disconnect()

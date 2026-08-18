@@ -20,9 +20,11 @@ type Row = {
 }
 
 const VISIBILITY_LABELS: Record<Row['visibility'], string> = {
-  AUTO: 'While in stock',
-  VISIBLE: 'Always',
-  HIDDEN: 'Never — hidden',
+  // AUTO is legacy: it used to hide a candle at zero stock. Sold-out candles
+  // now stay listed, so it reads the same as VISIBLE wherever it survives.
+  AUTO: 'Listed',
+  VISIBLE: 'Listed',
+  HIDDEN: 'Hidden',
 }
 
 /**
@@ -141,8 +143,10 @@ export function ProductRow({ product }: { product: Row }) {
             Shown
           </span>
           <select
-            value={product.visibility}
-            aria-label={`When to show ${product.name} on the shop`}
+            // A legacy AUTO row shows as Listed, which is how it now behaves.
+            // Without this the control would render with nothing selected.
+            value={product.visibility === 'AUTO' ? 'VISIBLE' : product.visibility}
+            aria-label={`Whether ${product.name} is listed on the shop`}
             onChange={(e) =>
               startTransition(async () => {
                 await setVisibility(product.id, e.target.value as Row['visibility'])
@@ -150,7 +154,7 @@ export function ProductRow({ product }: { product: Row }) {
             }
             className="h-9 w-full max-w-[10rem] border border-rule bg-surface px-2.5 text-[12.5px] text-ink focus:border-gild-deep focus:outline-none"
           >
-            {(['AUTO', 'VISIBLE', 'HIDDEN'] as const).map((value) => (
+            {(['VISIBLE', 'HIDDEN'] as const).map((value) => (
               <option key={value} value={value}>
                 {VISIBILITY_LABELS[value]}
               </option>

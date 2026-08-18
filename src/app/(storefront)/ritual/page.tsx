@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Image from 'next/image'
 import { ButtonLink } from '@/components/ui/Button'
+import { ScriptText } from '@/components/brand/ScriptText'
 
 export const metadata: Metadata = {
   title: 'The Ritual',
@@ -46,7 +47,7 @@ export default function RitualPage() {
         <div className="mx-auto max-w-7xl">
           <p className="label text-obsidian/55">The ritual</p>
           <h1 className="display-lg mt-5 max-w-[16ch] text-obsidian">
-            How to burn it <span className="script script-ink text-gild-deep">properly</span>
+            How to burn it <ScriptText ink className="text-gild-deep">properly</ScriptText>
           </h1>
           <p className="mt-6 max-w-[54ch] text-[17px] leading-relaxed text-obsidian/80">
             A hand-poured candle behaves differently from a supermarket one. Four

@@ -1,4 +1,5 @@
 import { LitSection } from '@/components/visual/LitSection'
+import { ScriptText } from '@/components/brand/ScriptText'
 export type ReviewItem = {
   id: string
   author: string
@@ -37,7 +38,7 @@ export function Reviews({ reviews }: { reviews: ReviewItem[] }) {
       <div className="mx-auto max-w-7xl">
         <div className="flex flex-wrap items-end justify-between gap-6">
           <h2 className="display-md reveal text-wax" id="reviews-heading">
-            In other people&rsquo;s <span className="script text-gild">homes</span>
+            In other people&rsquo;s <ScriptText className="text-gild">homes</ScriptText>
           </h2>
           <p className="label-sm reveal text-smoke">Verified buyers</p>
         </div>

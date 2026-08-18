@@ -4,7 +4,7 @@ import { db } from '@/lib/db'
 import { effectivePriceCents } from '@/lib/money'
 import { checkPromoCode } from '@/lib/promo'
 import { checkoutItemSchema } from '@/lib/validation'
-import { clientIpFrom } from '@/lib/rate-limit'
+import { clientIpFrom, createThrottle } from '@/lib/rate-limit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -15,18 +15,11 @@ const schema = z.object({
 })
 
 // Codes are guessable by design, so previewing one is throttled per address.
-const recent = new Map<string, number[]>()
-const WINDOW_MS = 60_000
-const MAX_PER_WINDOW = 12
-
-function throttled(ip: string): boolean {
-  const now = Date.now()
-  const hits = (recent.get(ip) ?? []).filter((t) => now - t < WINDOW_MS)
-  hits.push(now)
-  recent.set(ip, hits)
-  if (recent.size > 5000) recent.clear()
-  return hits.length > MAX_PER_WINDOW
-}
+const throttled = createThrottle({
+  windowMs: 60_000,
+  perVisitor: 12,
+  shared: 120,
+})
 
 /**
  * Previews a promo code against the current cart.

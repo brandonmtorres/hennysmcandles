@@ -13,7 +13,7 @@ import {
  * Cart state, persisted to localStorage.
  *
  * Prices held here are for display only. The server recomputes every amount
- * from the database when the Stripe Checkout session is created, so tampering
+ * from the database when the Square payment link is created, so tampering
  * with localStorage changes nothing about what a customer is charged.
  */
 

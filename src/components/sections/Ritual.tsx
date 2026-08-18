@@ -1,5 +1,6 @@
 import Image from 'next/image'
 import { ButtonLink } from '@/components/ui/Button'
+import { ScriptText } from '@/components/brand/ScriptText'
 
 /**
  * The page's one bright section — the point in the scroll where the light has
@@ -47,7 +48,7 @@ export function Ritual() {
               id="ritual-heading"
               style={{ '--reveal-delay': '80ms' } as React.CSSProperties}
             >
-              How to burn it<span className="script script-ink text-gild-deep"> properly</span>
+              How to burn it<ScriptText ink className="text-gild-deep"> properly</ScriptText>
             </h2>
             <p
               className="reveal mt-6 max-w-[42ch] text-[17px] leading-relaxed text-obsidian/80"

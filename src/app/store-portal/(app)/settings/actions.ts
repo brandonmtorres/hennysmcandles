@@ -24,6 +24,7 @@ export async function saveSettings(
     shippingFlatCents: parsePriceToCents(text('shippingFlat')) ?? 0,
     freeShippingThresholdCents: parsePriceToCents(text('freeShippingThreshold')) ?? 0,
     taxPercent: Number.parseFloat(text('taxPercent')) || 0,
+    taxHomeState: text('taxHomeState'),
     lowStockThreshold: Number.parseInt(text('lowStockThreshold'), 10) || 0,
     announcement: text('announcement'),
   })

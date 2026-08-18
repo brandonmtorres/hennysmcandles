@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
 import { getProductBySlug, getRelatedProducts, toCard } from '@/lib/products'
+import { getSettings, shippingNote } from '@/lib/settings'
 import { Gallery } from '@/components/product/Gallery'
 import { PurchasePanel } from '@/components/product/PurchasePanel'
 import { ProductTile } from '@/components/product/ProductCard'
@@ -43,6 +44,7 @@ export default async function ProductPage({ params }: Params) {
   ])
 
   const card = toCard(product)
+  const settings = await getSettings()
 
   const notes = [
     { label: 'Top', value: product.scentTop },
@@ -117,7 +119,7 @@ export default async function ProductPage({ params }: Params) {
               <p className="lede mt-6 max-w-[46ch]">{product.tagline}</p>
 
               <div className="mt-10 border-t border-wax/12 pt-10">
-                <PurchasePanel product={card} />
+                <PurchasePanel product={card} shippingNote={shippingNote(settings)} />
               </div>
 
               {notes.length > 0 ? (

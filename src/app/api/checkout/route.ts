@@ -1,39 +1,39 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { getStripe, isStripeConfigured } from '@/lib/stripe'
+import { isSquareConfigured } from '@/lib/square/client'
+import { createPaymentLink, type CheckoutLine } from '@/lib/square/checkout'
 import { effectivePriceCents } from '@/lib/money'
-import { getSettings, shippingCentsFor } from '@/lib/settings'
+import { chargesTax, getSettings, shippingCentsFor, taxCentsFor } from '@/lib/settings'
 import { checkoutRequestSchema } from '@/lib/validation'
+import { isUsState } from '@/lib/us-states'
 import { checkPromoCode } from '@/lib/promo'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+/** How long a quoted cart stays payable. */
+const SESSION_MINUTES = 120
+
 /**
- * Creates a Stripe Checkout session.
+ * Creates a Square hosted checkout link.
  *
  * Security model
  * --------------
- *  · The request carries product IDs and quantities only. Prices, names and
- *    discounts are read from the database here, so a tampered cart in
- *    localStorage cannot change what a customer is charged.
- *  · Stock is verified before the session is created, but is NOT decremented
- *    here. Decrementing happens only in the Stripe webhook once payment has
+ *  · The request carries product IDs, quantities and a destination state only.
+ *    Prices, discounts, shipping and tax are computed here from the database,
+ *    so a tampered cart in localStorage cannot change what a customer is
+ *    charged.
+ *  · Stock is verified before the link is created, but is NOT decremented
+ *    here. Decrementing happens only in the Square webhook once payment has
  *    actually succeeded — otherwise abandoned checkouts would drain inventory.
- *  · Card details never touch this server. Stripe's hosted Checkout page
- *    handles them, which also brings Apple Pay and Google Pay along for free.
+ *  · Card details never touch this server. Square's hosted page handles them,
+ *    which also brings Apple Pay, Google Pay and Cash App Pay along for free.
+ *
+ * The quote is written to a CheckoutSession row before the customer leaves.
+ * That row — not the payment's metadata — is what the webhook reads back to
+ * rebuild the order, so a cart of any size survives the round trip.
  */
 export async function POST(request: Request) {
-  if (!isStripeConfigured()) {
-    return NextResponse.json(
-      {
-        error:
-          'Payments are not configured yet. Add STRIPE_SECRET_KEY to .env to enable checkout.',
-      },
-      { status: 503 },
-    )
-  }
-
   let body: unknown
   try {
     body = await request.json()
@@ -45,6 +45,19 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json(
       { error: parsed.error.issues[0]?.message ?? 'That cart is not valid.' },
+      { status: 400 },
+    )
+  }
+
+  const settings = await getSettings()
+
+  // The destination is only demanded when it changes the amount. With no tax
+  // configured it changes nothing, so the cart never asked — and Square's own
+  // page collects the shipping address a moment later.
+  const shipToState = parsed.data.state ?? ''
+  if (chargesTax(settings) && !isUsState(shipToState)) {
+    return NextResponse.json(
+      { error: 'Choose the state you are shipping to.' },
       { status: 400 },
     )
   }
@@ -75,21 +88,32 @@ export async function POST(request: Request) {
     )
   }
 
-  const settings = await getSettings()
+  // Checked after the request has been judged on its own merits, so that a
+  // malformed cart is answered the same way whether or not payments happen to
+  // be switched on.
+  if (!isSquareConfigured()) {
+    return NextResponse.json(
+      {
+        error:
+          'Payments are not configured yet. Add SQUARE_ACCESS_TOKEN and SQUARE_LOCATION_ID to .env to enable checkout.',
+      },
+      { status: 503 },
+    )
+  }
+
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000'
 
-  const lineItems = []
+  const lines: CheckoutLine[] = []
   let subtotalCents = 0
 
   for (const product of products) {
     const quantity = quantities.get(product.id) ?? 0
     if (quantity <= 0) continue
 
-    // A hidden product must not be purchasable even via a stale cart.
-    const purchasable =
-      product.visibility === 'VISIBLE' ||
-      (product.visibility === 'AUTO' && product.stock > 0)
-    if (!purchasable) {
+    // A hidden product must not be purchasable even via a stale cart. Being
+    // sold out is handled separately, just below — that is a stock problem
+    // with its own, more useful message.
+    if (product.visibility === 'HIDDEN') {
       return NextResponse.json(
         { error: `${product.name} is no longer available.` },
         { status: 409 },
@@ -108,28 +132,22 @@ export async function POST(request: Request) {
       )
     }
 
-    const unitAmount = effectivePriceCents(
+    const unitPriceCents = effectivePriceCents(
       product,
       product.collections.map((link) => link.collection),
     )
-    subtotalCents += unitAmount * quantity
+    subtotalCents += unitPriceCents * quantity
 
-    lineItems.push({
+    lines.push({
+      productId: product.id,
+      name: product.name,
+      slug: product.slug,
+      unitPriceCents,
       quantity,
-      price_data: {
-        currency: settings.currency,
-        unit_amount: unitAmount,
-        product_data: {
-          name: product.name,
-          description: product.tagline.slice(0, 300),
-          images: product.images[0] ? [`${siteUrl}${product.images[0].url}`] : undefined,
-          metadata: { productId: product.id, slug: product.slug },
-        },
-      },
     })
   }
 
-  if (lineItems.length === 0) {
+  if (lines.length === 0) {
     return NextResponse.json({ error: 'Your cart is empty.' }, { status: 400 })
   }
 
@@ -137,7 +155,7 @@ export async function POST(request: Request) {
 
   // The promo code is re-validated here against a subtotal computed from the
   // database. Whatever the cart previewed is irrelevant — this is the number
-  // Stripe is told to charge.
+  // Square is told to charge.
   let promo: { id: string; code: string; discountCents: number } | null = null
   if (parsed.data.code) {
     const result = await checkPromoCode(parsed.data.code, subtotalCents)
@@ -147,73 +165,71 @@ export async function POST(request: Request) {
     promo = { id: result.id, code: result.code, discountCents: result.discountCents }
   }
 
-  try {
-    const stripe = getStripe()
+  const discountCents = promo?.discountCents ?? 0
+  const taxCents = taxCentsFor(subtotalCents - discountCents, shipToState, settings)
+  const totalCents = subtotalCents - discountCents + shippingCents + taxCents
 
-    // Stripe applies discounts through a coupon, so one is created per order
-    // for the exact amount. Creating it fresh keeps our rules — minimum spend,
-    // redemption limits, dates — the single source of truth rather than
-    // duplicating them into Stripe's own promotion objects.
-    const discounts = promo
-      ? [
-          {
-            coupon: (
-              await stripe.coupons.create({
-                amount_off: promo.discountCents,
-                currency: settings.currency,
-                duration: 'once',
-                name: `${promo.code}`,
-                metadata: { promoCodeId: promo.id, code: promo.code },
-              })
-            ).id,
-          },
-        ]
-      : undefined
-    const session = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      line_items: lineItems,
-      // Omitting payment_method_types lets Stripe present every method enabled
-      // on the account — cards, Apple Pay, Google Pay, Link — chosen per device.
-      automatic_tax: { enabled: false },
-      billing_address_collection: 'auto',
-      shipping_address_collection: { allowed_countries: ['US', 'CA', 'GB', 'AU'] },
-      shipping_options: [
-        {
-          shipping_rate_data: {
-            type: 'fixed_amount',
-            fixed_amount: { amount: shippingCents, currency: settings.currency },
-            display_name:
-              shippingCents === 0 ? 'Free shipping' : 'Standard shipping (2–5 days)',
-          },
-        },
-      ],
-      discounts,
-      phone_number_collection: { enabled: false },
-      success_url: `${siteUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${siteUrl}/products`,
-      // Read back by the webhook to rebuild the order.
-      metadata: {
-        cart: JSON.stringify(
-          lineItems.map((item) => ({
-            id: item.price_data.product_data.metadata.productId,
-            q: item.quantity,
-          })),
-        ),
-        ...(promo ? { promoCodeId: promo.id, promoCode: promo.code } : {}),
+  // The quote is recorded before the customer leaves, and never recomputed.
+  // A price edited in the portal while someone is mid-checkout therefore
+  // cannot change what they agreed to pay.
+  const session = await db.checkoutSession.create({
+    data: {
+      cart: JSON.stringify(
+        lines.map((line) => ({
+          id: line.productId,
+          q: line.quantity,
+          unit: line.unitPriceCents,
+          name: line.name,
+          slug: line.slug,
+        })),
+      ),
+      promoCodeId: promo?.id ?? null,
+      promoCode: promo?.code ?? null,
+      subtotalCents,
+      shippingCents,
+      taxCents,
+      discountCents,
+      totalCents,
+      currency: settings.currency,
+      shipToState,
+      expiresAt: new Date(Date.now() + SESSION_MINUTES * 60_000),
+    },
+  })
+
+  try {
+    const link = await createPaymentLink({
+      reference: session.id,
+      lines,
+      currency: settings.currency,
+      shippingCents,
+      discountCents,
+      discountLabel: promo?.code ?? null,
+      // The rate, not the amount: Square recomputes it against the discounted
+      // goods, and the webhook reconciles its figure against ours.
+      taxPercent: taxCents > 0 ? settings.taxPercent : 0,
+      shipToState,
+      // Our own session id, not Square's — the success page then does not
+      // depend on how Square happens to name its redirect parameters.
+      redirectUrl: `${siteUrl}/checkout/success?cs=${session.id}`,
+      supportEmail: settings.storeEmail,
+    })
+
+    await db.checkoutSession.update({
+      where: { id: session.id },
+      data: {
+        squareOrderId: link.squareOrderId,
+        squarePaymentLinkId: link.paymentLinkId,
+        paymentLinkUrl: link.url,
       },
     })
 
-    if (!session.url) {
-      return NextResponse.json(
-        { error: 'Stripe did not return a checkout link. Please try again.' },
-        { status: 502 },
-      )
-    }
-
-    return NextResponse.json({ url: session.url })
+    return NextResponse.json({ url: link.url })
   } catch (error) {
-    // The raw Stripe error may contain account details — log it, don't ship it.
-    console.error('[checkout] Stripe session creation failed:', error)
+    // The raw Square error may contain account details — log it, don't ship it.
+    console.error('[checkout] Square payment link creation failed:', error)
+    await db.checkoutSession
+      .update({ where: { id: session.id }, data: { status: 'EXPIRED' } })
+      .catch(() => {})
     return NextResponse.json(
       { error: 'We could not start the checkout. Please try again in a moment.' },
       { status: 502 },

@@ -4,6 +4,9 @@
  */
 import { chromium } from 'playwright-core'
 import fs from 'node:fs'
+import { PrismaClient } from '@prisma/client'
+
+const db = new PrismaClient()
 
 const EXECUTABLE = fs
   .readdirSync('/root/.cache/ms-playwright')
@@ -25,6 +28,18 @@ const browser = await chromium.launch({
   args: ['--no-sandbox', '--disable-dev-shm-usage'],
 })
 const page = await browser.newPage({ viewport: { width: 1440, height: 900 } })
+
+// Whether this environment can actually deliver mail. Several checks below
+// have a different correct answer depending on it.
+const mailConfigured = Boolean(
+  fs
+    .readFileSync('.env', 'utf8')
+    .split('\n')
+    .find((l) => l.startsWith('RESEND_API_KEY='))
+    ?.split('=')[1]
+    ?.replace(/"/g, '')
+    .trim(),
+)
 
 const consoleErrors = []
 page.on('console', (m) => {
@@ -74,7 +89,16 @@ broken === 0 ? pass(`all ${hrefs.length} internal links resolve`) : null
 
 // --- Cart ------------------------------------------------------------------
 console.log('\nCart')
-await page.goto(`${BASE}/products/black-sea-mist`, { waitUntil: 'networkidle' })
+// Whichever candle the shop actually lists first, rather than a slug typed
+// here — a hidden or renamed one used to break this test for reasons that had
+// nothing to do with the cart.
+await page.goto(`${BASE}/products`, { waitUntil: 'networkidle' })
+const firstCandle = await page
+  .locator('article a[href^="/products/"]')
+  .first()
+  .getAttribute('href')
+await page.goto(`${BASE}${firstCandle}`, { waitUntil: 'networkidle' })
+const candleName = (await page.locator('h1').first().innerText()).trim()
 
 await page.click('button:has-text("Add to cart")')
 await page.waitForTimeout(900)
@@ -91,18 +115,21 @@ const drawerOpen = () =>
 
 ;(await drawerOpen()) ? pass('drawer opens after adding') : fail('drawer did not open')
 
-;(await drawer.locator('text=Black Sea Mist').count()) > 0
-  ? pass('added candle appears in the drawer')
-  : fail('candle missing from drawer')
+;(await drawer.getByText(candleName, { exact: false }).count()) > 0
+  ? pass(`added candle appears in the drawer (${candleName})`)
+  : fail(`"${candleName}" missing from drawer`)
 
 const headerCount = await page.locator('header button[aria-label*="Open cart"]').innerText()
 headerCount.includes('1') ? pass('header badge shows 1') : fail(`header badge reads "${headerCount}"`)
 
-// Increase quantity and confirm the subtotal follows.
-const subtotalBefore = await drawer.locator('text=/^\\$[0-9.,]+$/').last().innerText()
+// Increase quantity and confirm the subtotal follows. The subtotal line is
+// read by name rather than by position: the drawer also shows shipping, tax
+// and a total, and the last figure in it is no longer the goods alone.
+const subtotalLine = drawer.locator('dt:text-is("Subtotal") + dd')
+const subtotalBefore = await subtotalLine.innerText()
 await drawer.locator('button[aria-label^="Increase quantity"]').first().click()
 await page.waitForTimeout(600)
-const subtotalAfter = await drawer.locator('text=/^\\$[0-9.,]+$/').last().innerText()
+const subtotalAfter = await subtotalLine.innerText()
 const toNum = (s) => Number(s.replace(/[^0-9.]/g, ''))
 Math.abs(toNum(subtotalAfter) - toNum(subtotalBefore) * 2) < 0.02
   ? pass(`subtotal doubled ${subtotalBefore} → ${subtotalAfter}`)
@@ -144,17 +171,28 @@ reachableWhenClosed === 0
 console.log('\nStock states')
 {
   const res = await page.request.post(`${BASE}/api/checkout`, {
-    data: { items: [{ productId: 'nope', quantity: 1 }] },
+    data: { items: [{ productId: 'nope', quantity: 1 }], state: 'OR' },
   })
   res.status() === 400
     ? pass('checkout rejects an unknown product')
     : fail(`checkout returned ${res.status()} for an unknown product`)
+
+  // Whether a destination is required depends on whether the shop charges
+  // tax, which is covered properly in test-webhook.mjs where the settings can
+  // be controlled. Here it is enough that a junk cart is refused either way.
+  const noState = await page.request.post(`${BASE}/api/checkout`, {
+    data: { items: [{ productId: 'nope', quantity: 1 }] },
+  })
+  noState.status() === 400
+    ? pass('checkout rejects a junk cart regardless of destination')
+    : fail(`checkout returned ${noState.status()} for a junk cart`)
 }
 
 // --- Forms -----------------------------------------------------------------
 console.log('\nForms')
 await page.goto(BASE, { waitUntil: 'networkidle' })
-await page.fill('#newsletter-email', `test${Date.now()}@example.com`)
+const signupEmail = `test${Date.now()}@example.com`
+await page.fill('#newsletter-email', signupEmail)
 await page.click('button:has-text("Join")')
 await page.waitForTimeout(1500)
 ;(await page.locator('text=/You are on the list/').count()) > 0
@@ -168,9 +206,21 @@ await page.fill('#email', 'test@example.com')
 await page.fill('#message', 'This is a test message from the automated suite.')
 await page.click('button:has-text("Send message")')
 await page.waitForTimeout(1800)
-;(await page.locator('text=Message sent').count()) > 0
-  ? pass('contact form submits')
-  : fail('contact form did not confirm')
+
+// A contact message exists only as an email — there is nowhere else it is
+// written down. So with no mail provider configured the form is *supposed* to
+// fail loudly rather than thank someone for a message that evaporated. Both
+// outcomes are correct; which one is correct depends on the environment.
+const contactSent = (await page.locator('text=Message sent').count()) > 0
+const contactRefused = (await page.locator('text=/could not send/i').count()) > 0
+
+if (contactSent) {
+  pass('contact form submits')
+} else if (contactRefused && !mailConfigured) {
+  pass('contact form fails honestly while no mail provider is configured')
+} else {
+  fail('contact form did not confirm')
+}
 
 // --- Accessibility ---------------------------------------------------------
 console.log('\nAccessibility')
@@ -237,11 +287,23 @@ console.log('\nJavaScript disabled')
 
 // --- Console ---------------------------------------------------------------
 console.log('\nConsole')
-consoleErrors.length === 0
+// A 502 from the contact form is the expected, correct answer when no mail
+// provider is configured — it is the form refusing to lose a message. It is
+// not a console error worth failing over in that state.
+const realErrors = consoleErrors.filter(
+  (e) => mailConfigured || !/502|Bad Gateway/i.test(e),
+)
+realErrors.length === 0
   ? pass('no console errors')
-  : fail(`${consoleErrors.length} console errors:\n     ${consoleErrors.slice(0, 5).join('\n     ')}`)
+  : fail(`${realErrors.length} console errors:\n     ${realErrors.slice(0, 5).join('\n     ')}`)
 
 console.log(
   process.exitCode ? '\n\x1b[31mSome checks failed.\x1b[0m\n' : '\n\x1b[32mAll checks passed.\x1b[0m\n',
 )
 await browser.close()
+
+// The signup above is real as far as the app is concerned, and left behind it
+// would sit in the owner's mailing list as a stranger they never acquired.
+await db.newsletterEvent.deleteMany({ where: { email: signupEmail } })
+await db.newsletterSubscriber.deleteMany({ where: { email: signupEmail } })
+await db.$disconnect()

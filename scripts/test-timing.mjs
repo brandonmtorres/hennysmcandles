@@ -4,6 +4,9 @@
  */
 import { chromium } from 'playwright-core'
 import fs from 'node:fs'
+import { PrismaClient } from '@prisma/client'
+
+const db = new PrismaClient()
 
 const EXECUTABLE = fs
   .readdirSync('/root/.cache/ms-playwright')
@@ -70,3 +73,11 @@ console.log(
 if (pct >= 30) process.exitCode = 1
 
 await browser.close()
+
+// These samples are deliberate failed sign-ins against the owner's real
+// account, and five of them is exactly the lockout threshold. Left behind they
+// would shut the owner out of the portal for fifteen minutes, so the synthetic
+// failures are cleared before leaving.
+await db.loginAttempt.deleteMany({ where: { successful: false } })
+await db.$disconnect()
+console.log('  cleared the sample attempts so the owner is not locked out\n')

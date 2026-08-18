@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
+import { getSettings, type StoreSettings } from '@/lib/settings'
+import { formatMoney } from '@/lib/money'
 
 type Policy = {
   title: string
@@ -7,7 +9,18 @@ type Policy = {
   sections: { heading: string; body: string[] }[]
 }
 
-const POLICIES: Record<string, Policy> = {
+/**
+ * The policies, written from the shop's own settings.
+ *
+ * Rates and thresholds are interpolated rather than typed out, because a
+ * policy page that disagrees with the checkout is the kind of mistake a
+ * customer is entitled to hold the shop to.
+ */
+function policiesFor(s: StoreSettings): Record<string, Policy> {
+  const flatRate = formatMoney(s.shippingFlatCents, s.currency)
+  const threshold = formatMoney(s.freeShippingThresholdCents, s.currency)
+
+  return {
   shipping: {
     title: 'Shipping & returns',
     intro:
@@ -23,8 +36,10 @@ const POLICIES: Record<string, Policy> = {
       {
         heading: 'Delivery and cost',
         body: [
-          'Standard shipping is a flat $6.95 and typically arrives in two to five business days. Orders over $75 ship free.',
-          'We currently ship to the United States, Canada, the United Kingdom and Australia. International orders may attract customs charges, which are the recipient’s responsibility.',
+          s.freeShippingThresholdCents > 0
+            ? `Standard shipping is a flat ${flatRate} and typically arrives in two to five business days. Orders over ${threshold} ship free.`
+            : `Standard shipping is a flat ${flatRate} and typically arrives in two to five business days.`,
+          'We currently ship within the United States only. If you are elsewhere and want a candle, write in — it can sometimes be arranged by hand.',
         ],
       },
       {
@@ -51,7 +66,7 @@ const POLICIES: Record<string, Policy> = {
         heading: 'What is collected',
         body: [
           'When you place an order: your name, email address, shipping address, and the contents of the order. When you join the mailing list: your email address only. When you write in through the contact form: your name, email address, and message.',
-          'Card details are never collected, seen, or stored by this site. Payment is handled entirely by Stripe on their own hosted page.',
+          'Card details are never collected, seen, or stored by this site. Payment is handled entirely by Square on their own hosted page.',
         ],
       },
       {
@@ -63,13 +78,13 @@ const POLICIES: Record<string, Policy> = {
       {
         heading: 'Who else sees it',
         body: [
-          'Stripe processes payments and receives the information required to do so. A shipping carrier receives your delivery address. An email provider delivers order confirmations. That is the complete list.',
+          'Square processes payments and receives the information required to do so. A shipping carrier receives your delivery address. An email provider delivers order confirmations. That is the complete list.',
         ],
       },
       {
         heading: 'Your choices',
         body: [
-          'Every marketing email has an unsubscribe link that works immediately. You can request a copy of your data or ask for it to be deleted by writing to hello@hennysmcandles.com; order records required for tax purposes are the one exception.',
+          `Every marketing email has an unsubscribe link that works immediately. You can request a copy of your data or ask for it to be deleted by writing to ${s.storeEmail}; order records required for tax purposes are the one exception.`,
         ],
       },
     ],
@@ -102,29 +117,33 @@ const POLICIES: Record<string, Policy> = {
       {
         heading: 'Governing law',
         body: [
-          'These terms are governed by the laws of the United States. Questions about any of this can go to hello@hennysmcandles.com.',
+          `These terms are governed by the laws of the United States. Questions about any of this can go to ${s.storeEmail}.`,
         ],
       },
     ],
   },
+  }
 }
+
+const SLUGS = ['shipping', 'privacy', 'terms']
 
 type Params = { params: Promise<{ slug: string }> }
 
 export function generateStaticParams() {
-  return Object.keys(POLICIES).map((slug) => ({ slug }))
+  return SLUGS.map((slug) => ({ slug }))
 }
 
 export async function generateMetadata({ params }: Params): Promise<Metadata> {
   const { slug } = await params
-  const policy = POLICIES[slug]
+  const policy = policiesFor(await getSettings())[slug]
   if (!policy) return { title: 'Not found' }
   return { title: policy.title, description: policy.intro }
 }
 
 export default async function PolicyPage({ params }: Params) {
   const { slug } = await params
-  const policy = POLICIES[slug]
+  const settings = await getSettings()
+  const policy = policiesFor(settings)[slug]
   if (!policy) notFound()
 
   return (
@@ -156,7 +175,7 @@ export default async function PolicyPage({ params }: Params) {
             month: 'long',
             year: 'numeric',
           })}
-          . Questions? Write to hello@hennysmcandles.com.
+          . Questions? Write to {settings.storeEmail}.
         </p>
       </div>
     </article>

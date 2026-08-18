@@ -2,8 +2,12 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { db } from '@/lib/db'
 import { formatMoney } from '@/lib/money'
+import { addressLines } from '@/lib/address'
 import { Card, OrderStatusBadge } from '@/components/portal/ui'
 import { OrderActions } from '@/components/portal/OrderActions'
+import { OrderProgress } from '@/components/portal/OrderProgress'
+import { CopyButton } from '@/components/portal/CopyButton'
+import { addressText } from '@/lib/address'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,21 +23,8 @@ export async function generateMetadata({ params }: Params) {
 }
 
 function parseAddress(raw: string | null) {
-  if (!raw) return null
-  try {
-    const parsed = JSON.parse(raw) as Record<string, unknown>
-    const inner = (parsed.address ?? parsed) as Record<string, unknown>
-    const lines = [
-      parsed.name,
-      inner.line1,
-      inner.line2,
-      [inner.city, inner.state, inner.postal_code].filter(Boolean).join(', '),
-      inner.country,
-    ].filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
-    return lines.length > 0 ? lines : null
-  } catch {
-    return null
-  }
+  const lines = addressLines(raw)
+  return lines.length > 0 ? lines : null
 }
 
 export default async function OrderDetailPage({ params }: Params) {
@@ -77,6 +68,30 @@ export default async function OrderDetailPage({ params }: Params) {
           </p>
         </div>
       </div>
+
+      {order.addressFlagged ? (
+        <div
+          role="status"
+          className="mb-8 border border-danger/40 bg-danger/8 px-5 py-4 text-[13.5px] leading-relaxed text-danger"
+        >
+          <strong className="font-normal uppercase tracking-[0.14em]">Check this one.</strong>{' '}
+          The address Square collected does not match the destination this order was
+          quoted for{order.shipToState ? ` (${order.shipToState})` : ''}, or the amount
+          charged differs from the quote. Sales tax may be wrong, or it may be going
+          somewhere the shop does not ship. Compare the address below against the total
+          before packing it.
+        </div>
+      ) : null}
+
+      <OrderProgress
+        order={{
+          id: order.id,
+          status: order.status,
+          trackingNumber: order.trackingNumber,
+          carrier: order.carrier,
+          hasAddress: address !== null,
+        }}
+      />
 
       <div className="grid gap-6 lg:grid-cols-[1.35fr_1fr]">
         <div className="flex flex-col gap-6">
@@ -124,6 +139,12 @@ export default async function OrderDetailPage({ params }: Params) {
                   {formatMoney(order.totalCents, order.currency)}
                 </dd>
               </div>
+              {order.refundedCents > 0 ? (
+                <Row
+                  label="Refunded"
+                  value={`−${formatMoney(order.refundedCents, order.currency)}`}
+                />
+              ) : null}
             </dl>
           </Card>
 
@@ -134,7 +155,10 @@ export default async function OrderDetailPage({ params }: Params) {
               trackingNumber: order.trackingNumber ?? '',
               carrier: order.carrier ?? '',
               internalNotes: order.internalNotes ?? '',
-              hasPaymentIntent: Boolean(order.stripePaymentIntentId),
+              hasPayment: Boolean(order.squarePaymentId),
+              totalCents: order.totalCents,
+              refundedCents: order.refundedCents,
+              currency: order.currency,
             }}
           />
         </div>
@@ -151,9 +175,16 @@ export default async function OrderDetailPage({ params }: Params) {
 
             {address ? (
               <div className="mt-6 border-t border-rule pt-5">
-                <p className="mb-2.5 text-[10.5px] uppercase tracking-[0.16em] text-ink-soft">
-                  Ship to
-                </p>
+                <div className="mb-2.5 flex items-baseline justify-between gap-3">
+                  <p className="text-[10.5px] uppercase tracking-[0.16em] text-ink-soft">
+                    Ship to
+                  </p>
+                  <CopyButton
+                    value={addressText(order.shippingAddress)}
+                    label="Copy address"
+                    copiedLabel="Copied ✓"
+                  />
+                </div>
                 <address className="text-[14px] not-italic leading-relaxed text-ink">
                   {address.map((line, i) => (
                     <span key={i} className="block">
@@ -162,7 +193,12 @@ export default async function OrderDetailPage({ params }: Params) {
                   ))}
                 </address>
               </div>
-            ) : null}
+            ) : (
+              <p className="mt-6 border-t border-rule pt-5 text-[13.5px] text-danger">
+                No shipping address was recorded. Look this order up in Square before
+                sending anything.
+              </p>
+            )}
           </Card>
 
           <Card title="Record">
@@ -183,9 +219,12 @@ export default async function OrderDetailPage({ params }: Params) {
                     : 'Not sent'
                 }
               />
-              <MetaRow label="Stripe session" value={order.stripeSessionId} mono />
-              {order.stripePaymentIntentId ? (
-                <MetaRow label="Payment" value={order.stripePaymentIntentId} mono />
+              {order.shipToState ? (
+                <MetaRow label="Taxed as" value={order.shipToState} />
+              ) : null}
+              <MetaRow label="Square order" value={order.squareOrderId} mono />
+              {order.squarePaymentId ? (
+                <MetaRow label="Payment" value={order.squarePaymentId} mono />
               ) : null}
             </dl>
           </Card>

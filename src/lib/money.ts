@@ -63,7 +63,7 @@ export function resolveDiscountPercent(
 /**
  * The price a customer actually pays, in cents.
  * This is the single source of truth used by the cart, the product page and
- * — critically — by the Stripe Checkout session builder.
+ * — critically — by the Square order builder at checkout.
  */
 export function effectivePriceCents(
   p: Priceable,

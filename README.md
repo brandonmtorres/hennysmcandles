@@ -5,9 +5,14 @@ runs the shop.
 
 ```bash
 npm install
-npm run setup     # creates the database and seeds the catalogue
-npm run dev       # http://localhost:3000
+cp .env.example .env      # then fill in DATABASE_URL at least
+npm run setup             # runs migrations and seeds the catalogue
+npm run dev               # http://localhost:3000
 ```
+
+Postgres is required — `DATABASE_URL` and `DIRECT_URL` both need to point at
+one. There is no zero-configuration mode; a shop that keeps orders in a file
+on a disk that its host wipes is not a shop.
 
 Sign into the portal at **`/store-portal`** with the credentials in `.env`
 (`PORTAL_OWNER_EMAIL` / `PORTAL_OWNER_PASSWORD`).
@@ -66,14 +71,15 @@ src/
       login/               sign-in + TOTP challenge
       (app)/               everything behind the auth guard
     api/
-      checkout/            creates the Stripe Checkout session
-      webhooks/stripe/     the only place orders are created
+      checkout/            prices the cart, creates the Square payment link
+      webhooks/square/     the only place orders are created
       newsletter/ contact/
   components/
     sections/  product/  cart/  layout/  portal/  visual/  brand/  ui/
   lib/
-    db · auth · stripe · money · products · settings · validation
-    rate-limit · words · email/{send,templates}
+    db · auth · money · products · settings · validation · us-states
+    order-number · rate-limit · words · square/{client,checkout,webhook}
+    email/{send,templates}
 ```
 
 **One app, not two.** The storefront and the portal share a database, a
@@ -107,33 +113,50 @@ shut.
   - Visibility is **Always**, **Never**, or **While in stock** (auto-hides at zero)
   - Sale is a percentage; the discounted price is *derived*, never stored, so it
     cannot drift out of sync with the list price
-- **Orders** — filter, view, add tracking (emails the customer), refund through Stripe
-- **Settings** — shipping rates, free-shipping threshold, low-stock threshold, announcement bar
+- **Orders** — filter, view, add tracking (emails the customer), refund in full or in part through Square
+- **Settings** — shipping rates, free-shipping threshold, sales tax and the state it applies to, low-stock threshold, announcement bar
 - **Security** — change password, enable TOTP two-factor, read the audit log
 
 ---
 
 ## How money and stock work
 
-Payment runs through **Stripe Checkout**, Stripe's own hosted page. Card details
-never reach this server, which keeps PCI scope minimal and brings Apple Pay,
-Google Pay, Link and cards along without extra work.
+Payment runs through **Square's hosted checkout**, on Square's own page. Card
+details never reach this server, which keeps PCI scope minimal and brings Apple
+Pay, Google Pay, Cash App Pay and cards along without extra work. The same
+Square account rings up candles at markets, so online and in-person takings
+land in one place.
 
-Three rules make the numbers trustworthy:
+Four rules make the numbers trustworthy:
 
-1. **The client never sends a price.** `/api/checkout` accepts product IDs and
-   quantities only. Every amount is read from the database. Editing
-   `localStorage` changes nothing about what a customer is charged.
+1. **The client never sends a price.** `/api/checkout` accepts product IDs,
+   quantities and a destination state only. Every amount is read from the
+   database. Editing `localStorage` changes nothing about what a customer is
+   charged.
 2. **Orders are created by the webhook, not the success page.** A browser can
    close before redirecting; a signed webhook is delivered regardless and
    retried until acknowledged.
 3. **Stock moves inside the same transaction as the order.** The decrement uses
    a database-level `decrement`, so two simultaneous orders cannot read the same
-   starting value and overwrite each other. A refund puts the stock back.
+   starting value and overwrite each other. A full refund puts the stock back; a
+   partial one does not, because usually nothing is coming back.
+4. **The webhook is a pointer, not data.** It says which payment changed; the
+   amounts are then read back from Square's API and recorded as charged. What
+   the shop quoted lives in a `CheckoutSession` row, and any disagreement
+   between the two flags the order for the owner rather than being silently
+   accepted.
 
-Replays are handled twice over: every Stripe event ID is recorded, and
-`Order.stripeSessionId` is unique — so even a *new* event for an
-already-processed session cannot create a second order.
+Replays are handled three ways over: every Square event ID is recorded,
+`Order.squareOrderId` is unique, and refunds are reconciled against the
+payment's cumulative refunded total rather than added up event by event.
+
+**An order is only created when a `CheckoutSession` matches it.** In-person
+payments raise identical webhooks, and without that rule every sale made at a
+market would appear as an unfulfilled web order and decrement online stock.
+
+Order numbers come from an atomic counter, so two webhooks landing together
+cannot be issued the same number and a deleted order cannot cause one to be
+reused.
 
 ---
 
@@ -151,7 +174,7 @@ already-processed session cannot create a second order.
 | Input | Zod schemas at every trust boundary; nothing is used before it is parsed |
 | SQL injection | Prisma only; no raw SQL anywhere |
 | XSS | React escaping throughout; the two `dangerouslySetInnerHTML` uses are a static script and JSON-LD with `<` escaped |
-| Webhooks | Stripe signature verified against the raw body before anything is read |
+| Webhooks | Square's HMAC-SHA256 over notification URL + raw body, compared in constant time before anything is read |
 | CSRF | Server Actions verify Origin; cookies are SameSite=Lax |
 | Headers | CSP, HSTS, `X-Frame-Options: DENY`, `nosniff`, Referrer-Policy |
 | Portal exposure | `noindex`, `no-store`, disallowed in `robots.txt`, and never linked from the public site |
@@ -161,19 +184,44 @@ already-processed session cannot create a second order.
 
 ## Going live
 
-1. **Stripe** — put live keys in `.env`, then register the webhook endpoint at
-   `https://your-domain/api/webhooks/stripe` for `checkout.session.completed`
-   and `charge.refunded`, and copy its signing secret into
-   `STRIPE_WEBHOOK_SECRET`.
-   Locally: `npm run stripe:listen`.
-2. **Email** — set `RESEND_API_KEY` and verify your sending domain. Until then
+1. **Square** — create an application at developer.squareup.com and put its
+   credentials in `.env`. Sandbox first: `SQUARE_ENVIRONMENT=sandbox` with the
+   Sandbox access token and location id, and pay with card
+   4111 1111 1111 1111. To go live, switch to the Production credentials and
+   set `SQUARE_ENVIRONMENT=production`.
+
+   Then subscribe a webhook to `https://your-domain/api/webhooks/square` for
+   `payment.created`, `payment.updated`, `refund.created` and `refund.updated`,
+   and copy its signing key into `SQUARE_WEBHOOK_SIGNATURE_KEY`. Put the same
+   URL, character for character, in `SQUARE_WEBHOOK_URL` — Square signs the URL
+   along with the body, so a mismatch there fails every delivery.
+
+   Locally, expose the port with a tunnel and point the subscription at it.
+2. **Sales tax** — set your state and its rate in the portal's Settings. Blank
+   charges nobody, which is the setting it ships on; it is a decision to make
+   knowingly, ideally with whoever does the books.
+3. **Email** — set `RESEND_API_KEY` and verify your sending domain. Until then
    every email renders to `.mail-preview/` instead of sending, so you can read
    exactly what customers would receive. No code changes either way.
-3. **Database** — SQLite is the default. For Postgres, change `provider` in
-   `prisma/schema.prisma` and point `DATABASE_URL` at the new instance. No model
-   changes are needed; enums are modelled as strings precisely so this holds.
-4. **Change the portal password** and turn on two-factor.
-5. Set `NEXT_PUBLIC_SITE_URL` to the real domain.
+4. **Database** — Postgres. `DATABASE_URL` is the pooled connection the app
+   runs on; `DIRECT_URL` bypasses the pooler and is used only by
+   `prisma migrate`, which needs a real session to take locks. On a plain
+   Postgres with no pooler, set both the same. Deploy migrations with
+   `npm run db:deploy`.
+
+   Coming from the old SQLite build?
+   `node --experimental-sqlite scripts/migrate-sqlite-to-postgres.mjs` carries
+   collections, settings, promo codes, subscribers and orders across, matching
+   products by slug. It is safe to run twice.
+
+5. **Product images** — set the `S3_` variables to any S3-compatible bucket
+   (R2, S3, Spaces, Supabase). Leave them blank and uploads go to
+   `public/uploads` on local disk, which is correct in development and wrong on
+   any host that wipes its filesystem between deploys. The portal says so
+   plainly if it is running in production without a bucket.
+6. **Change the portal password** and turn on two-factor.
+7. Set `NEXT_PUBLIC_SITE_URL` to the real domain and rebuild — it is baked in
+   at build time.
 
 ---
 
@@ -181,7 +229,10 @@ already-processed session cannot create a second order.
 
 ```bash
 npm run build            # typecheck + production build
-node scripts/test-webhook.mjs     # order pipeline: signatures, stock, replays, refunds
+npm run check:email               # can this shop actually send mail?
+npm run test:webhook              # order pipeline: pricing, signatures, stock, replays, refunds
+node scripts/test-security.mjs    # trust boundaries: portal access, headers, escaping
+node scripts/test-soldout.mjs     # a sold-out candle stays listed, and stays unbuyable
 node scripts/test-ui.mjs          # navigation, cart, forms, a11y, no-JS, reduced motion
 node scripts/test-navigation.mjs  # content populates on soft navigation, not just hard loads
 node scripts/probe-arc.mjs        # the dusk-to-dawn arc is a gradient, not a hard edge
@@ -199,8 +250,11 @@ Two of these exist because of bugs that were invisible to a screenshot:
   scroll and counts how many samples land mid-transition. A hard block boundary
   scores zero or one; the current sunrise scores nine.
 
-`test-webhook.mjs` signs payloads exactly as Stripe does, so the full order path
-is verifiable without a live Stripe account.
+`test-webhook.mjs` needs no Square account at all. It stands up a stub of
+Square's API, starts the built app pointed at it, and signs webhooks exactly as
+Square does — so pricing, tax, signature verification, stock movement, replays,
+partial and full refunds, and the in-person-sale rule are all proved offline.
+Run `npm run build` first; it tests the built app.
 
 Development helpers: `scripts/scroll-shots.mjs` (screenshots at real viewport
 sizes across scroll positions — full-page captures break `sticky` and `svh`),

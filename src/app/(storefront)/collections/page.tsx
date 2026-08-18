@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { getStorefrontCollections } from '@/lib/collections'
 import { LitSection } from '@/components/visual/LitSection'
 import { pluralise } from '@/lib/words'
+import { ScriptText } from '@/components/brand/ScriptText'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,7 +23,7 @@ export default async function CollectionsIndexPage() {
         <div className="mx-auto max-w-7xl">
           <p className="label text-gild/90">Collections</p>
           <h1 className="display-lg mt-5 max-w-[16ch] text-wax">
-            Gathered <span className="script text-gild">by season</span>
+            Gathered <ScriptText className="text-gild">by season</ScriptText>
           </h1>
           <p className="lede mt-6 max-w-[52ch]">
             Small groups of candles that belong together — a midwinter edit, a set for

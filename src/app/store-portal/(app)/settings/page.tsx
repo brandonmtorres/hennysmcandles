@@ -25,6 +25,7 @@ export default async function SettingsPage() {
           shippingFlat: (settings.shippingFlatCents / 100).toFixed(2),
           freeShippingThreshold: (settings.freeShippingThresholdCents / 100).toFixed(2),
           taxPercent: settings.taxPercent,
+          taxHomeState: settings.taxHomeState,
           lowStockThreshold: settings.lowStockThreshold,
           announcement: settings.announcement,
         }}

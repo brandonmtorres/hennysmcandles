@@ -3,6 +3,7 @@ import Image from 'next/image'
 import { MoonMark } from '@/components/brand/Wordmark'
 import { ButtonLink } from '@/components/ui/Button'
 import { LitSection } from '@/components/visual/LitSection'
+import { ScriptText } from '@/components/brand/ScriptText'
 
 export const metadata: Metadata = {
   title: 'Our Story',
@@ -43,7 +44,7 @@ export default function AboutPage() {
           <div className="max-w-[34rem]">
             <p className="label text-gild/90">Our story</p>
             <h1 className="display-lg mt-5 text-wax">
-              One person, <span className="script text-gild">one pour at a time</span>
+              One person, <ScriptText className="text-gild">one pour at a time</ScriptText>
             </h1>
             <p className="lede mt-6 max-w-[44ch]">
               Hennys M. Homemade Candles is not a factory with a founder&rsquo;s

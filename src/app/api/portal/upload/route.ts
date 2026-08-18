@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server'
-import { randomBytes } from 'node:crypto'
-import fs from 'node:fs/promises'
-import path from 'node:path'
 import { getSessionUser, recordAudit } from '@/lib/auth'
+import { putImage } from '@/lib/storage'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -26,7 +24,6 @@ export const dynamic = 'force-dynamic'
 
 const MAX_BYTES = 8 * 1024 * 1024
 const MAX_FILES = 8
-const UPLOAD_DIR = path.join(process.cwd(), 'public', 'uploads')
 
 type Detected = { ext: string; mime: string }
 
@@ -90,8 +87,6 @@ export async function POST(request: Request) {
     )
   }
 
-  await fs.mkdir(UPLOAD_DIR, { recursive: true })
-
   const uploaded: { url: string; name: string }[] = []
 
   for (const file of files) {
@@ -112,18 +107,19 @@ export async function POST(request: Request) {
       )
     }
 
-    // The stored name is generated, never derived from the upload.
-    const filename = `${Date.now().toString(36)}-${randomBytes(8).toString('hex')}.${detected.ext}`
-    const destination = path.join(UPLOAD_DIR, filename)
-
-    // Belt and braces: confirm the resolved path is still inside the upload
-    // directory before anything is written.
-    if (path.dirname(path.resolve(destination)) !== path.resolve(UPLOAD_DIR)) {
-      return NextResponse.json({ error: 'Rejected destination path.' }, { status: 400 })
+    // Where it lands — a bucket in production, local disk in development — is
+    // the storage layer's business. The name it is stored under is generated
+    // there too, never derived from the upload.
+    try {
+      const stored = await putImage(buffer, detected.ext, detected.mime)
+      uploaded.push({ url: stored.url, name: file.name })
+    } catch (error) {
+      console.error('[upload] Could not store image:', error)
+      return NextResponse.json(
+        { error: 'The image could not be saved. Check the storage settings.' },
+        { status: 502 },
+      )
     }
-
-    await fs.writeFile(destination, buffer)
-    uploaded.push({ url: `/uploads/${filename}`, name: file.name })
   }
 
   if (uploaded.length === 0) {

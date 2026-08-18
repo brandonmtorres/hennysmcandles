@@ -4,10 +4,15 @@ out/
 build/
 dist/
 
-# Secrets — never commit
-.env
-.env.local
-.env.*.local
+# Secrets — never commit.
+#
+# The glob is deliberately wide. A file called `.env.local-backup` matched none
+# of the narrower patterns that used to be here and sat untracked in the repo
+# root for weeks, one `git add -A` away from being published with a session
+# secret and a password in it. Anything that starts with `.env` stays out,
+# except the example, which is checked in on purpose.
+.env*
+!.env.example
 
 # Database
 *.db

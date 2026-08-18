@@ -1,16 +1,31 @@
 // Hennys M. Homemade Candles — data model
 //
-// SQLite for local development. To move to Postgres, change `provider` to
-// "postgresql" and point DATABASE_URL at the new instance; no model changes
-// are required (enums are modelled as strings precisely so this stays true).
+// Postgres. Enums are modelled as strings, which kept the move from SQLite to
+// a single line of configuration and keeps the schema portable if it ever has
+// to move again.
 
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider = "postgresql"
+
+  // Two URLs, because serverless and migrations want opposite things.
+  //
+  // DATABASE_URL is the pooled connection the app runs on. A serverless
+  // function is short-lived and can be spun up by the hundred, so each one
+  // opening its own Postgres connection exhausts the server's limit long
+  // before traffic does; a pooler in front (PgBouncer, or whatever Neon,
+  // Supabase and Vercel put there) hands out cheap connections instead.
+  //
+  // DIRECT_URL bypasses that pooler. Migrations take advisory locks and issue
+  // DDL in a session, neither of which survives transaction-mode pooling. It
+  // is used only by `prisma migrate`, never by the running app.
+  //
+  // On a plain Postgres with no pooler, set both to the same value.
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ---------------------------------------------------------------------------
@@ -135,15 +150,15 @@ model Order {
   id          String @id @default(cuid())
   orderNumber String @unique // human-facing, e.g. HM-1042
 
-  // Unique so a replayed Stripe webhook can never create a duplicate order.
-  stripeSessionId       String  @unique
-  stripePaymentIntentId String?
+  // Unique so a replayed Square webhook can never create a duplicate order.
+  squareOrderId   String  @unique
+  squarePaymentId String?
 
   email String
   name  String?
   phone String?
 
-  // "PENDING" | "PAID" | "FULFILLED" | "CANCELLED" | "REFUNDED"
+  // "PENDING" | "PAID" | "FULFILLED" | "CANCELLED" | "PARTIALLY_REFUNDED" | "REFUNDED"
   status String @default("PENDING")
 
   subtotalCents Int
@@ -153,7 +168,21 @@ model Order {
   totalCents    Int
   currency      String @default("usd")
 
-  shippingAddress String? // JSON blob as returned by Stripe
+  /// Running total actually refunded. A partial refund records the amount here
+  /// and leaves the order otherwise intact; only a refund covering the whole
+  /// total returns the goods to the shelf.
+  refundedCents Int @default(0)
+
+  /// The state the customer told us before paying, which is what tax was
+  /// charged on. Kept so a later dispute can be answered from our own records.
+  shipToState String?
+
+  /// Set when the address Square collected disagrees with `shipToState`, i.e.
+  /// tax may have been charged at the wrong rate. Surfaced in the portal for
+  /// the owner to resolve by hand rather than silently corrected.
+  addressFlagged Boolean @default(false)
+
+  shippingAddress String? // JSON blob as returned by Square
   trackingNumber  String?
   carrier         String?
   internalNotes   String?
@@ -238,11 +267,87 @@ model AuditLog {
   @@index([createdAt])
 }
 
-/// Guarantees Stripe webhooks are processed exactly once.
+/// Guarantees Square webhooks are processed exactly once.
 model ProcessedWebhook {
-  id          String   @id // the Stripe event id
+  id          String   @id // the Square event id
   type        String
   processedAt DateTime @default(now())
+}
+
+/// A cart, priced and frozen, waiting for the customer to come back from
+/// Square's hosted payment page.
+///
+/// This exists because the webhook has to rebuild the order from exactly what
+/// was quoted, and the quote cannot travel with the payment: Square's order
+/// metadata caps a value at 255 characters, which a real cart outgrows. So the
+/// cart is written here and the payment carries only this row's id.
+///
+/// It doubles as an abandoned-checkout record — a row still OPEN an hour later
+/// is someone who reached the payment page and left.
+model CheckoutSession {
+  id String @id @default(cuid())
+
+  /// The priced cart: [{ id, q, unit }]. Written once and never recomputed, so
+  /// a price change mid-checkout cannot alter what the customer agreed to pay.
+  cart String
+
+  promoCodeId   String?
+  promoCode     String?
+
+  subtotalCents Int
+  shippingCents Int    @default(0)
+  taxCents      Int    @default(0)
+  discountCents Int    @default(0)
+  totalCents    Int
+  currency      String @default("usd")
+
+  /// Two-letter US state the customer said they were shipping to. Tax depends
+  /// on it, so it is recorded rather than inferred.
+  shipToState String
+
+  squareOrderId       String? @unique
+  squarePaymentLinkId String?
+  paymentLinkUrl      String?
+
+  /// "OPEN" | "COMPLETED" | "EXPIRED"
+  status String @default("OPEN")
+
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@index([status, createdAt])
+}
+
+/// The wording of an automatic email, as the owner has edited it.
+///
+/// Only the words live here. The layout — the masthead, the item table, the
+/// totals, the address — stays in code, because those are the parts that have
+/// to survive Outlook and that nobody wants to maintain by hand. A row absent
+/// from this table means the brand default is used, so the shop always sends
+/// something sensible even before anyone has opened the editor.
+model EmailTemplate {
+  /// "order_confirmation" | "shipping_notice"
+  key String @id
+
+  subject String
+  heading String
+  /// Plain text; blank lines separate paragraphs. Tokens like {{order_number}}
+  /// are substituted at send time.
+  intro   String
+  /// A closing note under the order summary. May be left empty.
+  outro   String @default("")
+
+  updatedAt DateTime @updatedAt
+}
+
+/// Named counters that must never repeat a value.
+///
+/// Order numbers came from counting rows, which two simultaneous webhooks can
+/// read identically, and which reuses a number after a deletion. An atomic
+/// increment inside the order transaction has neither problem.
+model Counter {
+  name  String @id
+  value Int    @default(0)
 }
 
 // ---------------------------------------------------------------------------
@@ -287,7 +392,7 @@ model PromoCode {
   @@index([active])
 }
 
-/// One use of a code, recorded when the Stripe webhook confirms payment.
+/// One use of a code, recorded when the Square webhook confirms payment.
 model PromoRedemption {
   id            String @id @default(cuid())
   promoCodeId   String
@@ -303,10 +408,82 @@ model PromoRedemption {
 }
 
 model NewsletterSubscriber {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  source    String   @default("footer")
+  id    String  @id @default(cuid())
+  email String  @unique
+  name  String?
+
+  /// "SUBSCRIBED" | "UNSUBSCRIBED" | "BOUNCED"
+  status String @default("SUBSCRIBED")
+  /// Where they signed up: "footer" | "popup" | "checkout" | "manual" | "import"
+  source String @default("footer")
+
+  /// Lets someone leave from an email without signing in.
+  /// The default exists so existing rows can migrate; application code writes
+  /// a cryptographically random token, which is what actually guards the link.
+  unsubscribeToken String @unique
+
+  subscribedAt   DateTime  @default(now())
+  unsubscribedAt DateTime?
+  /// Set when a welcome email has gone out, so it is never sent twice.
+  welcomedAt     DateTime?
+
+  /// Free-text label the owner can use to group people.
+  tag String @default("")
+
+  events NewsletterEvent[]
+
   createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@index([status, subscribedAt])
+}
+
+/// Append-only history of joins and leaves, which is what the growth view reads.
+/// Kept separate from the subscriber row because a row only records the current
+/// state — it cannot say that somebody left in March and came back in June.
+model NewsletterEvent {
+  id           String  @id @default(cuid())
+  subscriberId String?
+  /// Retained even if the subscriber row is later deleted, so history holds.
+  email        String
+
+  /// "SUBSCRIBED" | "UNSUBSCRIBED" | "RESUBSCRIBED" | "BOUNCED" | "DELETED"
+  type   String
+  source String @default("")
+
+  subscriber NewsletterSubscriber? @relation(fields: [subscriberId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([type, createdAt])
+}
+
+/// One newsletter send.
+model Campaign {
+  id      String @id @default(cuid())
+  subject String
+  /// Plain text with blank lines between paragraphs; wrapped in the brand
+  /// template at send time.
+  body    String @default("")
+  preheader String @default("")
+
+  /// Optional call to action.
+  ctaLabel String @default("")
+  ctaUrl   String @default("")
+
+  /// "DRAFT" | "SENDING" | "SENT" | "FAILED"
+  status String @default("DRAFT")
+
+  sentAt         DateTime?
+  recipientCount Int       @default(0)
+  failureCount   Int       @default(0)
+  lastError      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status, createdAt])
 }
 
 model Review {

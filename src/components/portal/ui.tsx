@@ -134,6 +134,29 @@ export function PortalButton({
   )
 }
 
+/**
+ * A standing notice at the top of a page — payments switched off, mail not
+ * sending. Shared rather than redefined per page so "something is not
+ * configured" always looks the same wherever it is said.
+ */
+export function Banner({
+  tone,
+  children,
+}: {
+  tone: 'warn' | 'info'
+  children: React.ReactNode
+}) {
+  const styles =
+    tone === 'warn'
+      ? 'border-danger/35 bg-danger/8 text-danger'
+      : 'border-gild-deep/35 bg-gild/10 text-gild-deep'
+  return (
+    <div className={`border px-5 py-3.5 text-[13px] leading-relaxed ${styles}`}>
+      {children}
+    </div>
+  )
+}
+
 const badgeTones = {
   neutral: 'border-rule bg-parchment text-ink-soft',
   good: 'border-success/35 bg-success/10 text-[#4d7048]',
@@ -164,6 +187,8 @@ export function OrderStatusBadge({ status }: { status: string }) {
       return <Badge tone="warn">To pack</Badge>
     case 'FULFILLED':
       return <Badge tone="good">Shipped</Badge>
+    case 'PARTIALLY_REFUNDED':
+      return <Badge tone="warn">Part refunded</Badge>
     case 'REFUNDED':
       return <Badge tone="bad">Refunded</Badge>
     case 'CANCELLED':

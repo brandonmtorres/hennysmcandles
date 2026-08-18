@@ -6,6 +6,7 @@ import { db } from '@/lib/db'
 import { requireUser, recordAudit } from '@/lib/auth'
 import { fieldErrors, productSchema, slugify } from '@/lib/validation'
 import { parsePriceToCents } from '@/lib/money'
+import { isAllowedImageUrl } from '@/lib/storage'
 
 export type ProductFormState = {
   errors?: Record<string, string>
@@ -79,11 +80,9 @@ function readImages(formData: FormData): { url: string; alt: string }[] {
         typeof (item as { url?: unknown }).url === 'string',
     )
     .map((item) => ({ url: item.url.trim(), alt: String(item.alt ?? '').trim() }))
-    .filter(
-      (item) =>
-        (item.url.startsWith('/uploads/') || item.url.startsWith('/images/')) &&
-        !item.url.includes('..'),
-    )
+    // Only images this shop issued — see isAllowedImageUrl. A product form is
+    // a trust boundary, not a convenience.
+    .filter((item) => isAllowedImageUrl(item.url))
     .slice(0, 8)
     .map((item) => ({
       url: item.url,

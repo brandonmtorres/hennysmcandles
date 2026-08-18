@@ -1,25 +1,22 @@
 import { NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 import { newsletterSchema } from '@/lib/validation'
-import { clientIpFrom } from '@/lib/rate-limit'
+import { clientIpFrom, createThrottle } from '@/lib/rate-limit'
+import { subscribe, type SubscribeSource } from '@/lib/newsletter'
+import { getSettings } from '@/lib/settings'
+import { sendEmail } from '@/lib/email/send'
+import { welcomeEmail } from '@/lib/email/templates'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-// A small in-memory throttle. Enough to stop casual form spam; swap for a
-// shared store if the app is ever deployed to more than one instance.
-const recent = new Map<string, number[]>()
-const WINDOW_MS = 60_000
-const MAX_PER_WINDOW = 5
+const throttled = createThrottle({
+  windowMs: 60_000,
+  perVisitor: 5,
+  shared: 60,
+})
 
-function throttled(ip: string): boolean {
-  const now = Date.now()
-  const hits = (recent.get(ip) ?? []).filter((t) => now - t < WINDOW_MS)
-  hits.push(now)
-  recent.set(ip, hits)
-  if (recent.size > 5000) recent.clear()
-  return hits.length > MAX_PER_WINDOW
-}
+const SOURCES: SubscribeSource[] = ['footer', 'popup', 'checkout']
 
 export async function POST(request: Request) {
   const ip = clientIpFrom(request.headers)
@@ -45,12 +42,14 @@ export async function POST(request: Request) {
     )
   }
 
+  const raw = (body as { source?: unknown }).source
+  const source = SOURCES.includes(raw as SubscribeSource)
+    ? (raw as SubscribeSource)
+    : 'footer'
+
+  let result: Awaited<ReturnType<typeof subscribe>>
   try {
-    await db.newsletterSubscriber.upsert({
-      where: { email: parsed.data.email },
-      update: {},
-      create: { email: parsed.data.email, source: 'footer' },
-    })
+    result = await subscribe(parsed.data.email, source)
   } catch (error) {
     console.error('[newsletter] Could not save subscriber:', error)
     return NextResponse.json(
@@ -59,7 +58,44 @@ export async function POST(request: Request) {
     )
   }
 
-  // The same response either way — whether an address is already subscribed
+  if (!result.ok) {
+    return NextResponse.json({ error: result.reason }, { status: 400 })
+  }
+
+  const settings = await getSettings()
+
+  // The welcome goes out once per person, ever. Someone who leaves and returns
+  // does not get the discount a second time.
+  if (result.status === 'new' || result.status === 'resubscribed') {
+    const subscriber = await db.newsletterSubscriber.findUnique({
+      where: { email: parsed.data.email },
+      select: { id: true, welcomedAt: true },
+    })
+
+    if (subscriber && !subscriber.welcomedAt) {
+      const email = welcomeEmail({
+        token: result.token,
+        discountPercent: settings.newsletterDiscountPercent,
+        discountCode: settings.newsletterWelcomeCode || undefined,
+      })
+      const sent = await sendEmail({
+        to: parsed.data.email,
+        subject: email.subject,
+        html: email.html,
+      })
+      if (sent.ok) {
+        await db.newsletterSubscriber.update({
+          where: { id: subscriber.id },
+          data: { welcomedAt: new Date() },
+        })
+      }
+    }
+  }
+
+  // The same response either way — whether an address is already on the list
   // is not something a stranger should be able to probe.
-  return NextResponse.json({ message: 'You are on the list.' })
+  return NextResponse.json({
+    message: 'You are on the list.',
+    discountPercent: settings.newsletterDiscountPercent,
+  })
 }

@@ -1,10 +1,14 @@
 import type { Metadata } from 'next'
 import { requireUser } from '@/lib/auth'
 import { db } from '@/lib/db'
-import { isStripeConfigured, isStripeTestMode } from '@/lib/stripe'
+import { isSquareConfigured, isSquareSandbox } from '@/lib/square/client'
+import { Banner } from '@/components/portal/ui'
+import { isDurableStorageConfigured } from '@/lib/storage'
 import { PortalNav } from '@/components/portal/PortalNav'
 
 export const dynamic = 'force-dynamic'
+
+const isProduction = process.env.NODE_ENV === 'production'
 
 export const metadata: Metadata = {
   title: { default: 'Store portal', template: '%s · Store portal' },
@@ -38,40 +42,38 @@ export default async function PortalAppLayout({
       />
 
       <div className="mx-auto max-w-[86rem] px-5 pb-24 pt-8 sm:px-8">
-        {!isStripeConfigured() ? (
+        <div className="[&>*]:mb-7">
+        {!isSquareConfigured() ? (
           <Banner tone="warn">
-            Payments are switched off. Add <code className="font-mono">STRIPE_SECRET_KEY</code>{' '}
-            and <code className="font-mono">STRIPE_WEBHOOK_SECRET</code> to your{' '}
+            Payments are switched off. Add{' '}
+            <code className="font-mono">SQUARE_ACCESS_TOKEN</code> and{' '}
+            <code className="font-mono">SQUARE_LOCATION_ID</code> to your{' '}
             <code className="font-mono">.env</code> file to start taking orders.
           </Banner>
-        ) : isStripeTestMode() ? (
+        ) : isSquareSandbox() ? (
           <Banner tone="info">
-            Stripe is in test mode. Orders placed now are not real — use card
-            4242&nbsp;4242&nbsp;4242&nbsp;4242. Swap in your live keys when you are ready
-            to open.
+            Square is in sandbox mode. Orders placed now are not real — use card
+            4111&nbsp;1111&nbsp;1111&nbsp;1111 with any future expiry and CVV 111. Set{' '}
+            <code className="font-mono">SQUARE_ENVIRONMENT=production</code> with your
+            live credentials when you are ready to open.
           </Banner>
         ) : null}
 
+        {/* Only worth saying where it can actually bite: in development the
+            local folder is the right answer and survives perfectly well. */}
+        {isProduction && !isDurableStorageConfigured() ? (
+          <Banner tone="warn">
+            Product images are being written to this server&rsquo;s disk, which most
+            hosts wipe on every deploy — a catalogue of photography can disappear
+            without warning. Configure{' '}
+            <code className="font-mono">S3_BUCKET</code> and its keys to store
+            them somewhere permanent.
+          </Banner>
+        ) : null}
+        </div>
+
         {children}
       </div>
-    </div>
-  )
-}
-
-function Banner({
-  tone,
-  children,
-}: {
-  tone: 'warn' | 'info'
-  children: React.ReactNode
-}) {
-  const styles =
-    tone === 'warn'
-      ? 'border-danger/35 bg-danger/8 text-danger'
-      : 'border-gild-deep/35 bg-gild/10 text-gild-deep'
-  return (
-    <div className={`mb-7 border px-5 py-3.5 text-[13px] leading-relaxed ${styles}`}>
-      {children}
     </div>
   )
 }

@@ -3,7 +3,8 @@
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
 import { requireUser, recordAudit } from '@/lib/auth'
-import { getStripe, isStripeConfigured } from '@/lib/stripe'
+import { getSquare, isSquareConfigured, money } from '@/lib/square/client'
+import { formatMoney, parsePriceToCents } from '@/lib/money'
 import { sendEmail } from '@/lib/email/send'
 import { shippingNoticeEmail } from '@/lib/email/templates'
 
@@ -38,7 +39,7 @@ export async function markFulfilled(
     },
   })
 
-  const email = shippingNoticeEmail({
+  const email = await shippingNoticeEmail({
     orderNumber: order.orderNumber,
     customerName: order.name,
     email: order.email,
@@ -90,9 +91,12 @@ export async function markFulfilled(
 }
 
 /**
- * Refunds through Stripe. Stock is returned to the shelf by the
- * `charge.refunded` webhook rather than here, so a refund issued from the
- * Stripe dashboard behaves identically to one issued from this portal.
+ * Refunds through Square, in full or in part.
+ *
+ * The order record is not touched here. Square's `refund.updated` webhook is
+ * what writes the refunded amount and the new status, so a refund issued from
+ * the Square dashboard — or from the card reader at a market — behaves
+ * identically to one issued from this portal.
  */
 export async function refundOrder(
   _previous: OrderActionState,
@@ -105,21 +109,47 @@ export async function refundOrder(
 
   if (!order) return { error: 'That order no longer exists.' }
   if (order.status === 'REFUNDED') return { error: 'This order is already refunded.' }
-  if (!order.stripePaymentIntentId) {
-    return { error: 'No Stripe payment is attached to this order.' }
+  if (!order.squarePaymentId) {
+    return { error: 'No Square payment is attached to this order.' }
   }
-  if (!isStripeConfigured()) {
-    return { error: 'Stripe is not configured, so no refund can be issued.' }
+  if (!isSquareConfigured()) {
+    return { error: 'Square is not configured, so no refund can be issued.' }
   }
 
+  // Blank means the whole remaining balance, which is the common case and the
+  // one the confirm button offers.
+  const typedAmount = String(formData.get('amount') ?? '').trim()
+  const remainingCents = order.totalCents - order.refundedCents
+  let amountCents = remainingCents
+
+  if (typedAmount) {
+    const parsedAmount = parsePriceToCents(typedAmount)
+    if (parsedAmount === null || parsedAmount <= 0) {
+      return { error: 'Enter an amount like 12.50, or leave it blank to refund it all.' }
+    }
+    if (parsedAmount > remainingCents) {
+      return {
+        error: `That is more than the ${formatMoney(remainingCents, order.currency)} still refundable on this order.`,
+      }
+    }
+    amountCents = parsedAmount
+  }
+
+  if (amountCents <= 0) return { error: 'There is nothing left to refund.' }
+
   try {
-    await getStripe().refunds.create({
-      payment_intent: order.stripePaymentIntentId,
-      reason: 'requested_by_customer',
+    await getSquare().refunds.refundPayment({
+      // Square requires an idempotency key; this one is unique per refund
+      // attempt but stable within it, so a double-submitted form cannot
+      // refund twice.
+      idempotencyKey: `${order.id}-${order.refundedCents}-${amountCents}`,
+      paymentId: order.squarePaymentId,
+      amountMoney: money(amountCents, order.currency),
+      reason: 'Requested by customer',
     })
   } catch (error) {
     console.error('[orders] Refund failed:', error)
-    return { error: 'Stripe rejected the refund. Check the Stripe dashboard.' }
+    return { error: 'Square rejected the refund. Check the Square dashboard.' }
   }
 
   await recordAudit({
@@ -127,13 +157,18 @@ export async function refundOrder(
     action: 'order.refund',
     entity: 'order',
     entityId: orderId,
-    meta: { amount: order.totalCents },
+    meta: { amount: amountCents, full: amountCents === remainingCents },
   })
 
   revalidatePath('/store-portal/orders')
   revalidatePath(`/store-portal/orders/${orderId}`)
 
-  return { message: 'Refund issued. Stock returns automatically once Stripe confirms.' }
+  return {
+    message:
+      amountCents === remainingCents
+        ? 'Refund issued. Stock returns automatically once Square confirms.'
+        : `${formatMoney(amountCents, order.currency)} refunded. Stock is left as it is — adjust it by hand if the candle is coming back.`,
+  }
 }
 
 export async function saveOrderNotes(

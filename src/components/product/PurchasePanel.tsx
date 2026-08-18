@@ -6,8 +6,20 @@ import { Button } from '@/components/ui/Button'
 import { formatMoney } from '@/lib/money'
 import type { ProductCard } from '@/lib/products'
 
-/** Quantity selector plus add-to-cart, kept together so they share state. */
-export function PurchasePanel({ product }: { product: ProductCard }) {
+/**
+ * Quantity selector plus add-to-cart, kept together so they share state.
+ *
+ * The shipping line is passed in rather than written here: it used to name a
+ * threshold in prose, which quietly disagreed with the shop's settings the
+ * first time the owner changed one.
+ */
+export function PurchasePanel({
+  product,
+  shippingNote,
+}: {
+  product: ProductCard
+  shippingNote: string
+}) {
   const { add, lines } = useCart()
   const [quantity, setQuantity] = useState(1)
   const [added, setAdded] = useState(false)
@@ -35,7 +47,7 @@ export function PurchasePanel({ product }: { product: ProductCard }) {
       </div>
 
       <p className="mt-3 text-[13px] text-smoke">
-        {product.sizeOz} oz · Free shipping on orders over $75
+        {product.sizeOz} oz · {shippingNote}
       </p>
 
       <div className="mt-8 flex flex-wrap items-stretch gap-3">

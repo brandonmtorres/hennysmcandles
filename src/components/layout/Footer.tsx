@@ -5,9 +5,6 @@ import { NewsletterForm } from '@/components/layout/NewsletterForm'
 const SHOP = [
   { href: '/products', label: 'All candles' },
   { href: '/collections', label: 'Collections' },
-  { href: '/products/black-sea-mist', label: 'Black Sea Mist' },
-  { href: '/products/moonlit-snow', label: 'Moonlit Snow' },
-  { href: '/products/amethyst-moon', label: 'Amethyst Moon' },
 ]
 
 const STUDIO = [
@@ -22,7 +19,19 @@ const LEGAL = [
   { href: '/policies/terms', label: 'Terms' },
 ]
 
-export function Footer({ discountPercent }: { discountPercent: number }) {
+export function Footer({
+  discountPercent,
+  candles,
+}: {
+  discountPercent: number
+  /** Named candles to link, taken from the live catalogue rather than typed
+   *  here — a hidden or renamed one must not stay linked from every page. */
+  candles: { slug: string; name: string }[]
+}) {
+  const shopLinks = [
+    ...SHOP,
+    ...candles.map((c) => ({ href: `/products/${c.slug}`, label: c.name })),
+  ]
   return (
     <footer className="veil-deep relative overflow-hidden border-t border-wax/10">
       <div className="mx-auto max-w-7xl px-5 pb-10 pt-20 sm:px-8 sm:pt-24">
@@ -37,7 +46,7 @@ export function Footer({ discountPercent }: { discountPercent: number }) {
             </p>
           </div>
 
-          <FooterColumn title="Shop" links={SHOP} />
+          <FooterColumn title="Shop" links={shopLinks} />
           <FooterColumn title="Studio" links={STUDIO} />
 
           <div>

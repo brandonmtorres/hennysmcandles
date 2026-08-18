@@ -3,6 +3,8 @@ import { db } from '@/lib/db'
 import { formatMoney } from '@/lib/money'
 import { ButtonLink } from '@/components/ui/Button'
 import { ClearCartOnMount } from '@/components/cart/ClearCartOnMount'
+import { OrderPoller } from '@/components/cart/OrderPoller'
+import { ScriptText } from '@/components/brand/ScriptText'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,16 +16,26 @@ export const metadata: Metadata = {
 export default async function CheckoutSuccessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ session_id?: string }>
+  searchParams: Promise<{ cs?: string }>
 }) {
-  const { session_id: sessionId } = await searchParams
+  const { cs: checkoutSessionId } = await searchParams
 
-  // The order is created by the Stripe webhook, which may land a moment after
+  // The order is created by the Square webhook, which may land a moment after
   // the customer is redirected here. A missing order is therefore normal, not
   // an error — the page reassures either way.
-  const order = sessionId
+  //
+  // The lookup goes through our own checkout session rather than a Square id,
+  // so the redirect carries an identifier we issued and control.
+  const session = checkoutSessionId
+    ? await db.checkoutSession.findUnique({
+        where: { id: checkoutSessionId },
+        select: { squareOrderId: true },
+      })
+    : null
+
+  const order = session?.squareOrderId
     ? await db.order.findUnique({
-        where: { stripeSessionId: sessionId },
+        where: { squareOrderId: session.squareOrderId },
         include: { items: true },
       })
     : null
@@ -43,14 +55,19 @@ export default async function CheckoutSuccessPage({
 
         <p className="label mt-10 text-gild/90">Thank you</p>
         <h1 className="display-lg mt-5 text-wax">
-          Your order is <span className="script text-gild">confirmed</span>
+          Your order is <ScriptText className="text-gild">confirmed</ScriptText>
         </h1>
 
         <p className="lede mx-auto mt-6 max-w-[46ch]">
           {order
             ? `Order ${order.orderNumber} is in. A confirmation is on its way to ${order.email}.`
-            : 'Payment received. A confirmation email is on its way to you now.'}
+            : 'Payment received, and your candles are spoken for.'}
         </p>
+
+        {/* The webhook that writes the order can land a moment after the
+            customer does. Rather than leaving them on a page that never
+            resolves, it fills itself in. */}
+        {!order && checkoutSessionId ? <OrderPoller /> : null}
 
         {order ? (
           <div className="mx-auto mt-12 max-w-md border-t border-wax/12 pt-8 text-left">

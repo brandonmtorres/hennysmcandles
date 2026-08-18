@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { markJoined } from '@/lib/newsletter-prefs'
 
 export function NewsletterForm({ discountPercent }: { discountPercent: number }) {
   const [email, setEmail] = useState('')
@@ -15,12 +16,14 @@ export function NewsletterForm({ discountPercent }: { discountPercent: number })
       const response = await fetch('/api/newsletter', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, source: 'footer' }),
       })
       const payload = (await response.json()) as { message?: string; error?: string }
       if (response.ok) {
         setState('done')
         setMessage(payload.message ?? 'You are on the list.')
+        // Recorded so the popup never asks somebody who has just signed up here.
+        markJoined()
       } else {
         setState('error')
         setMessage(payload.error ?? 'That did not work. Try again.')
@@ -33,14 +36,14 @@ export function NewsletterForm({ discountPercent }: { discountPercent: number })
 
   if (state === 'done') {
     return (
-      <p role="status" className="text-[13.5px] leading-relaxed text-gild">
+      <p role="status" data-newsletter-inline="" className="text-[13.5px] leading-relaxed text-gild">
         {message} Look out for your {discountPercent}% code.
       </p>
     )
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate>
+    <form onSubmit={onSubmit} noValidate data-newsletter-inline="">
       <label htmlFor="newsletter-email" className="label-sm mb-3 block text-smoke">
         {discountPercent}% off your first order
       </label>

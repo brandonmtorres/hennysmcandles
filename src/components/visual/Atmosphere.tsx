@@ -27,6 +27,8 @@ type Ember = {
   maxLife: number
   warm: boolean
   wobble: number
+  /** 0 far, 1 near. Drives size, speed and brightness together. */
+  depth: number
 }
 
 export function Atmosphere({
@@ -34,7 +36,7 @@ export function Atmosphere({
   /** Where the heat comes from, 0–1 across the canvas. */
   sourceX = 0.74,
   sourceY = 0.5,
-  emberCount = 46,
+  emberCount = 120,
   /** How strongly the air carries embers sideways, in px/frame. */
   drift = -0.34,
 }: {
@@ -63,16 +65,38 @@ export function Atmosphere({
     const embers: Ember[] = []
 
     const resetEmber = (e: Ember, seed = false) => {
-      // Born in a small pocket around the flame.
-      e.x = width * sourceX + (Math.random() - 0.5) * width * 0.07
-      e.y = height * sourceY + (Math.random() - 0.5) * height * 0.1
-      e.vx = drift * (0.5 + Math.random())
-      e.vy = -(0.16 + Math.random() * 0.34)
-      e.radius = 0.5 + Math.random() * 1.7
-      e.maxLife = 420 + Math.random() * 520
-      e.life = seed ? Math.random() * e.maxLife : 0
+      // Born in a pocket around the flame, wide enough that a crowded field
+      // still reads as air off the heat rather than a jet from one point.
+      e.x = width * sourceX + (Math.random() - 0.5) * width * 0.13
+      e.y = height * sourceY + (Math.random() - 0.5) * height * 0.16
+
+      // Depth, 0 far to 1 near. Distant embers are smaller, slower and dimmer,
+      // which is what keeps a dense field looking like layers of air instead of
+      // one flat swarm — the thing that goes wrong when you simply add more.
+      e.depth = Math.random() ** 1.5
+      const near = 0.45 + e.depth * 0.55
+
+      e.vx = drift * (0.5 + Math.random()) * near
+      e.vy = -(0.16 + Math.random() * 0.34) * near
+      e.radius = 0.35 + e.depth * 1.75
+      // Long enough to actually cross the frame. At the previous life an ember
+      // covered barely a hundred and fifty pixels before dying, so the field
+      // stayed a halo around the flame and never became the drift over the type
+      // that ties the two columns together.
+      e.maxLife = 1500 + Math.random() * 1500
+      e.life = 0
       e.warm = Math.random() > 0.3
       e.wobble = Math.random() * Math.PI * 2
+
+      // On the very first build the field is dealt out mid-journey rather than
+      // all stacked on the flame, so the drift is already there when the page
+      // opens instead of taking half a minute to spread. Each seeded ember is
+      // moved to where its age would have carried it.
+      if (seed) {
+        e.life = Math.random() * e.maxLife
+        e.x += drift * (0.6 + e.depth * 0.4) * e.life
+        e.y += (e.vy * (1 - 0.9985 ** e.life)) / 0.0015
+      }
     }
 
     const build = () => {
@@ -82,7 +106,7 @@ export function Atmosphere({
       for (let i = 0; i < count; i += 1) {
         const e: Ember = {
           x: 0, y: 0, vx: 0, vy: 0, radius: 1,
-          life: 0, maxLife: 1, warm: true, wobble: 0,
+          life: 0, maxLife: 1, warm: true, wobble: 0, depth: 1,
         }
         resetEmber(e, true)
         embers.push(e)
@@ -131,23 +155,37 @@ export function Atmosphere({
 
         const progress = e.life / e.maxLife
 
-        // Rising air wanders; the wobble keeps paths from looking ruled.
+        // Carried by a steady breeze rather than coasting to a stop.
+        //
+        // Sideways speed used to be damped towards zero every frame, which
+        // capped how far an ember could ever travel at a couple of hundred
+        // pixels however long it lived — the reason the field stayed bunched
+        // around the flame. Now it relaxes towards the speed of the air itself,
+        // so an ember keeps moving for as long as it burns and genuinely
+        // crosses the hero from the candle to the type.
+        const wind = drift * (0.6 + e.depth * 0.4)
+        e.vx += (wind - e.vx) * 0.006
+
+        // The wobble keeps paths from looking ruled.
         e.wobble += 0.011
         e.vx += Math.sin(e.wobble) * 0.008
-        e.vx *= 0.995
         e.x += e.vx
         e.y += e.vy
         e.vy *= 0.9985
 
-        // Fade in fast and out slowly. Embers hold full brightness across most
-        // of the frame and only dissolve in the last stretch on the left —
-        // they are meant to carry over the type, since that crossing is what
-        // joins the two columns.
-        const entry = progress < 0.1 ? progress / 0.1 : 1
-        const exit = Math.max(0, 1 - (progress - 0.1) / 0.9)
-        const lateral = Math.max(0.22, Math.min(1, e.x / (width * 0.26)))
+        // Held bright for most of the crossing, then let go. Fading linearly
+        // from birth meant the average ember sat at about a quarter strength,
+        // so adding more of them mostly added more things too faint to see.
+        const entry = progress < 0.08 ? progress / 0.08 : 1
+        const exit = progress < 0.74 ? 1 : Math.max(0, 1 - (progress - 0.74) / 0.26)
 
-        context.globalAlpha = entry * exit * lateral * (e.warm ? 0.72 : 0.34)
+        // Dissolve only at the very edge, so embers stay lit right across the
+        // type — that crossing is what makes the two columns read as one frame.
+        const lateral = Math.max(0.12, Math.min(1, e.x / (width * 0.12)))
+
+        // Distant embers sit back rather than all burning at one brightness.
+        const presence = 0.58 + e.depth * 0.42
+        context.globalAlpha = entry * exit * lateral * presence * (e.warm ? 0.82 : 0.4)
         context.fillStyle = e.warm ? '#ffb15e' : '#e8dfcd'
         context.beginPath()
         context.arc(e.x, e.y, e.radius, 0, Math.PI * 2)

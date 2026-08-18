@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { sendEmail } from '@/lib/email/send'
 import { escapeHtml } from '@/lib/email/templates'
 import { emailSchema } from '@/lib/validation'
-import { clientIpFrom } from '@/lib/rate-limit'
+import { clientIpFrom, createThrottle } from '@/lib/rate-limit'
 import { getSettings } from '@/lib/settings'
 
 export const runtime = 'nodejs'
@@ -18,18 +18,11 @@ const schema = z.object({
   company: z.string().max(0).optional().default(''),
 })
 
-const recent = new Map<string, number[]>()
-const WINDOW_MS = 10 * 60_000
-const MAX_PER_WINDOW = 4
-
-function throttled(ip: string): boolean {
-  const now = Date.now()
-  const hits = (recent.get(ip) ?? []).filter((t) => now - t < WINDOW_MS)
-  hits.push(now)
-  recent.set(ip, hits)
-  if (recent.size > 5000) recent.clear()
-  return hits.length > MAX_PER_WINDOW
-}
+const throttled = createThrottle({
+  windowMs: 10 * 60_000,
+  perVisitor: 4,
+  shared: 40,
+})
 
 export async function POST(request: Request) {
   const ip = clientIpFrom(request.headers)

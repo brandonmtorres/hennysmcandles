@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { db } from '@/lib/db'
 import { recordAudit, requireUser } from '@/lib/auth'
 import { fieldErrors, slugSchema, slugify } from '@/lib/validation'
+import { isAllowedImageUrl } from '@/lib/storage'
 
 export type CollectionFormState = {
   errors?: Record<string, string>
@@ -88,11 +89,8 @@ export async function saveCollection(
   const { imageUrl, ...rest } = parsed.data
   const data = {
     ...rest,
-    // Same rule as product images: same-origin paths only.
-    imageUrl:
-      imageUrl && (imageUrl.startsWith('/uploads/') || imageUrl.startsWith('/images/'))
-        ? imageUrl
-        : null,
+    // Same rule as product images.
+    imageUrl: imageUrl && isAllowedImageUrl(imageUrl) ? imageUrl : null,
     startsAt,
     endsAt,
   }

@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { ScriptText } from '@/components/brand/ScriptText'
 
 export default function NotFound() {
   return (
@@ -9,7 +10,7 @@ export default function NotFound() {
         </span>
         <p className="label mt-9 text-gild/90">Page not found</p>
         <h1 className="display-lg mt-5 text-wax">
-          Nothing lit <span className="script text-gild">here</span>
+          Nothing lit <ScriptText className="text-gild">here</ScriptText>
         </h1>
         <p className="lede mt-5">
           This page has burned down. The collection is still glowing.

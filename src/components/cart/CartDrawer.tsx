@@ -4,20 +4,28 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { useCart } from '@/components/cart/CartProvider'
+import { DestinationField } from '@/components/cart/DestinationField'
 import { Button, ButtonLink } from '@/components/ui/Button'
 import { formatMoney } from '@/lib/money'
 
 export function CartDrawer({
   freeShippingThresholdCents,
+  shippingFlatCents,
+  taxPercent,
+  taxHomeState,
 }: {
   freeShippingThresholdCents: number
+  shippingFlatCents: number
+  taxPercent: number
+  taxHomeState: string
 }) {
   const { lines, isOpen, close, setQuantity, remove, subtotalCents, count } = useCart()
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [shipState, setShipState] = useState('')
 
   // The promo code is only ever a preview here. The server re-checks it when
-  // the Stripe session is created, so a tampered discount changes nothing.
+  // the payment link is created, so a tampered discount changes nothing.
   const [code, setCode] = useState('')
   const [promo, setPromo] = useState<{ code: string; discountCents: number } | null>(null)
   const [promoError, setPromoError] = useState<string | null>(null)
@@ -65,6 +73,26 @@ export function CartDrawer({
       ? Math.min(100, (subtotalCents / freeShippingThresholdCents) * 100)
       : 100
 
+  // The destination is only asked for when it changes the amount — that is,
+  // when the shop charges tax. Shipping is one flat rate nationwide, so with
+  // no tax the question earns nothing and Square collects the address a moment
+  // later anyway.
+  const asksDestination = Boolean(taxHomeState) && taxPercent > 0
+
+  // A preview of the same arithmetic the server performs. The server's answer
+  // is the one that is charged; this exists so the customer is not surprised
+  // by a number that first appears on Square's page.
+  const discountCents = promo?.discountCents ?? 0
+  const shippingCents =
+    subtotalCents <= 0 || (freeShippingThresholdCents > 0 && remaining === 0)
+      ? 0
+      : shippingFlatCents
+  const taxCents =
+    asksDestination && shipState === taxHomeState
+      ? Math.round(((subtotalCents - discountCents) * taxPercent) / 100)
+      : 0
+  const totalCents = Math.max(0, subtotalCents - discountCents) + shippingCents + taxCents
+
   async function applyCode() {
     if (!code.trim() || checkingPromo) return
     setCheckingPromo(true)
@@ -98,6 +126,10 @@ export function CartDrawer({
   }
 
   async function checkout() {
+    if (asksDestination && !shipState) {
+      setError('Choose the state you are shipping to first.')
+      return
+    }
     setSubmitting(true)
     setError(null)
     try {
@@ -105,9 +137,11 @@ export function CartDrawer({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          // Only identifiers, quantities and the code are sent. The server
-          // prices the order and re-validates the code.
+          // Only identifiers, quantities, the code and the destination are
+          // sent. The server prices the order, re-validates the code and works
+          // out shipping and tax itself.
           items: lines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
+          ...(shipState ? { state: shipState } : {}),
           ...(promo ? { code: promo.code } : {}),
         }),
       })
@@ -364,21 +398,56 @@ export function CartDrawer({
                 )}
               </div>
 
-              <div className="flex items-baseline justify-between">
-                <span className="label text-smoke">Subtotal</span>
+              {asksDestination ? (
+                <DestinationField
+                  value={shipState}
+                  onChange={setShipState}
+                  tabbable={isOpen}
+                />
+              ) : null}
+
+              {/* Totals are announced politely: they change under the customer
+                  when a code is applied or a state chosen, and a screen reader
+                  user should hear the new figure without hunting for it. */}
+              <dl
+                aria-live="polite"
+                className="flex flex-col gap-1.5 text-[12.5px] text-smoke"
+              >
+                <div className="flex items-baseline justify-between">
+                  <dt>Subtotal</dt>
+                  <dd className="tabular-nums">{formatMoney(subtotalCents)}</dd>
+                </div>
+                {discountCents > 0 ? (
+                  <div className="flex items-baseline justify-between text-gild">
+                    <dt>{promo?.code}</dt>
+                    <dd className="tabular-nums">−{formatMoney(discountCents)}</dd>
+                  </div>
+                ) : null}
+                <div className="flex items-baseline justify-between">
+                  <dt>Shipping</dt>
+                  <dd className="tabular-nums">
+                    {shippingCents === 0 ? 'Free' : formatMoney(shippingCents)}
+                  </dd>
+                </div>
+                {taxCents > 0 ? (
+                  <div className="flex items-baseline justify-between">
+                    <dt>Sales tax</dt>
+                    <dd className="tabular-nums">{formatMoney(taxCents)}</dd>
+                  </div>
+                ) : null}
+              </dl>
+
+              <div className="mt-3 flex items-baseline justify-between border-t border-wax/10 pt-3">
+                <span className="label text-smoke">Total</span>
                 <span className="font-[family-name:var(--font-display)] text-2xl tabular-nums text-wax">
-                  {formatMoney(Math.max(0, subtotalCents - (promo?.discountCents ?? 0)))}
+                  {formatMoney(totalCents)}
                 </span>
               </div>
-              {promo ? (
-                <p className="mt-1 text-right text-[12px] text-smoke">
-                  <span className="line-through">{formatMoney(subtotalCents)}</span> before
-                  your code
+              {asksDestination && !shipState ? (
+                <p className="mt-1.5 text-[11.5px] text-smoke">
+                  Choose a state to see the tax on this order.
                 </p>
               ) : null}
-              <p className="mt-1.5 text-[11.5px] text-smoke">
-                Shipping and taxes are calculated at checkout.
-              </p>
 
               {error ? (
                 <p
@@ -392,6 +461,7 @@ export function CartDrawer({
               <Button
                 onClick={checkout}
                 disabled={submitting || lines.length === 0}
+                aria-busy={submitting}
                 tabIndex={isOpen ? 0 : -1}
                 className="mt-5 w-full"
                 size="lg"
@@ -399,8 +469,18 @@ export function CartDrawer({
                 {submitting ? 'Taking you to checkout…' : 'Checkout'}
               </Button>
 
-              <p className="label-sm mt-4 text-center text-smoke/70">
-                Secure payment via Stripe
+              {/* Leaving the site to pay is the moment a hosted checkout loses
+                  people. Saying plainly where they are going, that the address
+                  is asked for there, and that they come back, costs two lines
+                  and removes the surprise. */}
+              {/* Full-strength smoke, not a faded tint: at this size the 70%
+                  tint measures 3.2:1 against the drawer, under the 4.5:1 that
+                  small text needs. */}
+              <p className="mt-4 text-center text-[12px] leading-relaxed text-smoke">
+                You will finish on Square&rsquo;s secure page — card details never
+                touch this site.
+                <br />
+                Delivery address is asked for there.
               </p>
             </footer>
           </>

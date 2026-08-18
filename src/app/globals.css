@@ -527,6 +527,35 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Print — the packing slip
+   --------------------------------------------------------------------------- */
+
+@media print {
+  /* Paper is white and ink is expensive. The portal's parchment ground and
+     every piece of navigation come off, leaving the sheet alone on the page. */
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  header[class*='sticky'],
+  nav {
+    display: none !important;
+  }
+
+  /* Printers drop backgrounds by default, which would take the note panel's
+     tint with them; this asks for it to be kept where the browser allows. */
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  @page {
+    margin: 14mm;
+  }
+}
+
+/* ---------------------------------------------------------------------------
    Scrollbar
    --------------------------------------------------------------------------- */
 

@@ -193,7 +193,7 @@ const products: SeedProduct[] = [
 
 const settings: Record<string, string> = {
   store_name: 'Hennys M. Homemade Candles',
-  store_email: 'hello@hennysmcandles.com',
+  store_email: 'support@hennysmcandles.com',
   currency: 'usd',
   // Money values in cents.
   shipping_flat_cents: '695',

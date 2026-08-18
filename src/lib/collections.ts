@@ -111,8 +111,9 @@ export async function getActiveBanner(now = new Date()) {
     products: collection.products
       .filter(
         (link) =>
-          link.product.visibility === 'VISIBLE' ||
-          (link.product.visibility === 'AUTO' && link.product.stock > 0),
+          // Sold-out candles stay in the collection, marked as such. See
+          // STOREFRONT_VISIBILITY in products.ts.
+          link.product.visibility !== 'HIDDEN',
       )
       .map((link) => toCardWithPromos(link.product, [collection], now)),
   }
@@ -140,8 +141,9 @@ export async function getFeaturedCollections(limit = 2, now = new Date()) {
       // A hidden or sold-through candle should not surface via a collection.
       .filter(
         (link) =>
-          link.product.visibility === 'VISIBLE' ||
-          (link.product.visibility === 'AUTO' && link.product.stock > 0),
+          // Sold-out candles stay in the collection, marked as such. See
+          // STOREFRONT_VISIBILITY in products.ts.
+          link.product.visibility !== 'HIDDEN',
       )
       .map((link) => toCardWithPromos(link.product, [collection], now)),
   })) satisfies CollectionCard[]
@@ -159,8 +161,9 @@ export async function getCollectionBySlug(slug: string, now = new Date()) {
     cards: collection.products
       .filter(
         (link) =>
-          link.product.visibility === 'VISIBLE' ||
-          (link.product.visibility === 'AUTO' && link.product.stock > 0),
+          // Sold-out candles stay in the collection, marked as such. See
+          // STOREFRONT_VISIBILITY in products.ts.
+          link.product.visibility !== 'HIDDEN',
       )
       .map((link) => toCardWithPromos(link.product, [collection], now)),
   }

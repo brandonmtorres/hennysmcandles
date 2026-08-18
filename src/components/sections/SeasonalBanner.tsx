@@ -6,6 +6,7 @@ import { SeasonalWeather } from '@/components/visual/SeasonalWeather'
 import { getTheme } from '@/lib/themes'
 import { formatMoney } from '@/lib/money'
 import type { ProductCard } from '@/lib/products'
+import { ScriptText } from '@/components/brand/ScriptText'
 
 export type SeasonalBannerData = {
   slug: string
@@ -156,9 +157,9 @@ export function SeasonalBanner({
           ) : (
             <>
               {theme.headingLead}{' '}
-              <span className="script" style={{ color: theme.accent }}>
+              <ScriptText style={{ color: theme.accent }}>
                 {theme.headingAccent}
-              </span>
+              </ScriptText>
             </>
           )}
         </h2>
